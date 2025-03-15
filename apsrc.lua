@@ -169,7 +169,7 @@ function AnimationLogger:Init()
         end
     end)
     
-    -- Create title bar
+    -- Create title bar with responsive layout
     local TitleBar = Instance.new("Frame")
     TitleBar.Name = "TitleBar"
     TitleBar.Size = UDim2.new(1, 0, 0, 40)
@@ -184,12 +184,12 @@ function AnimationLogger:Init()
     -- Create title
     local Title = Instance.new("TextLabel")
     Title.Name = "Title"
-    Title.Size = UDim2.new(0, 150, 1, 0)
+    Title.Size = UDim2.new(0, 120, 1, 0)
     Title.Position = UDim2.new(0, 15, 0, 0)
     Title.BackgroundTransparency = 1
     Title.Text = "Animation Logger"
     Title.TextColor3 = config.textColor
-    Title.TextSize = 18
+    Title.TextSize = 16
     Title.FontFace = font
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TitleBar
@@ -197,75 +197,51 @@ function AnimationLogger:Init()
     -- Create credits
     local Credits = Instance.new("TextLabel")
     Credits.Name = "Credits"
-    Credits.Size = UDim2.new(0, 100, 0, 20)
-    Credits.Position = UDim2.new(0, 15, 1, -20)
+    Credits.Size = UDim2.new(0, 60, 0, 20)
+    Credits.Position = UDim2.new(0, 15, 1, -15)
     Credits.BackgroundTransparency = 1
     Credits.Text = "by vertb1"
     Credits.TextColor3 = Color3.fromRGB(150, 150, 150)
-    Credits.TextSize = 12
+    Credits.TextSize = 11
     Credits.FontFace = font
     Credits.TextXAlignment = Enum.TextXAlignment.Left
     Credits.Parent = TitleBar
     
-    -- Create toggle button for Show All/Show Parried
-    local ToggleViewButton = Instance.new("TextButton")
-    ToggleViewButton.Name = "ToggleViewButton"
-    ToggleViewButton.Size = UDim2.new(0, 120, 0, 26)
-    ToggleViewButton.Position = UDim2.new(0, 165, 0.5, -13)
-    ToggleViewButton.BackgroundColor3 = config.accentColor
-    ToggleViewButton.Text = "Show Parried"
-    ToggleViewButton.TextColor3 = config.textColor
-    ToggleViewButton.FontFace = font
-    ToggleViewButton.TextSize = 14
-    ToggleViewButton.Parent = TitleBar
+    -- Create responsive button layout
+    local ButtonsLayout = Instance.new("UIListLayout")
+    ButtonsLayout.FillDirection = Enum.FillDirection.Horizontal
+    ButtonsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    ButtonsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    ButtonsLayout.Padding = UDim.new(0, 10)
+    ButtonsLayout.Parent = TitleBar
     
-    local UICornerToggleBtn = Instance.new("UICorner")
-    UICornerToggleBtn.CornerRadius = UDim.new(0, 4)
-    UICornerToggleBtn.Parent = ToggleViewButton
+    local ButtonsPadding = Instance.new("UIPadding")
+    ButtonsPadding.PaddingRight = UDim.new(0, 40) -- Space for close button
+    ButtonsPadding.Parent = TitleBar
     
-    local showParriedOnly = false
+    -- Create top buttons with responsive layout
+    local ClearButton = self:CreateTopButton("Clear", config.neutralColor, function()
+        self:ClearLogs()
+    end, TitleBar)
+    ClearButton.LayoutOrder = 1
     
-    ToggleViewButton.MouseButton1Click:Connect(function()
-        showParriedOnly = not showParriedOnly
-        
-        -- Update button text and color
-        if showParriedOnly then
-            ToggleViewButton.Text = "Show All"
-            ToggleViewButton.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-        else
-            ToggleViewButton.Text = "Show Parried"
-            ToggleViewButton.BackgroundColor3 = config.accentColor
-        end
-        
-        -- Filter logs
-        self:FilterParriedLogs(not showParriedOnly)
-    end)
+    local ExportButton = self:CreateTopButton("Export", config.neutralColor, function()
+        self:ExportAnimations()
+    end, TitleBar)
+    ExportButton.LayoutOrder = 2
     
-    -- Create top buttons container
-    local TopButtonsContainer = Instance.new("Frame")
-    TopButtonsContainer.Name = "TopButtonsContainer"
-    TopButtonsContainer.Size = UDim2.new(0, 250, 1, 0)
-    TopButtonsContainer.Position = UDim2.new(0, 295, 0, 0)
-    TopButtonsContainer.BackgroundTransparency = 1
-    TopButtonsContainer.Parent = TitleBar
-    
-    local UIListLayoutTop = Instance.new("UIListLayout")
-    UIListLayoutTop.FillDirection = Enum.FillDirection.Horizontal
-    UIListLayoutTop.HorizontalAlignment = Enum.HorizontalAlignment.Left
-    UIListLayoutTop.VerticalAlignment = Enum.VerticalAlignment.Center
-    UIListLayoutTop.Padding = UDim.new(0, 15)
-    UIListLayoutTop.Parent = TopButtonsContainer
-    
-    -- Log Local toggle
+    -- Log Local toggle with responsive layout
     local LogLocalContainer = Instance.new("Frame")
     LogLocalContainer.Name = "LogLocalContainer"
     LogLocalContainer.Size = UDim2.new(0, 110, 0, 30)
     LogLocalContainer.BackgroundTransparency = 1
-    LogLocalContainer.Parent = TopButtonsContainer
+    LogLocalContainer.LayoutOrder = 3
+    LogLocalContainer.Parent = TitleBar
     
     local LogLocalLabel = Instance.new("TextLabel")
     LogLocalLabel.Name = "LogLocalLabel"
-    LogLocalLabel.Size = UDim2.new(0, 70, 1, 0)
+    LogLocalLabel.Size = UDim2.new(0, 60, 1, 0)
+    LogLocalLabel.Position = UDim2.new(0, 0, 0, 0)
     LogLocalLabel.BackgroundTransparency = 1
     LogLocalLabel.Text = "Log Local"
     LogLocalLabel.TextColor3 = config.textColor
@@ -277,7 +253,7 @@ function AnimationLogger:Init()
     local LogLocalToggle = Instance.new("Frame")
     LogLocalToggle.Name = "LogLocalToggle"
     LogLocalToggle.Size = UDim2.new(0, 40, 0, 20)
-    LogLocalToggle.Position = UDim2.new(0, 70, 0.5, -10)
+    LogLocalToggle.Position = UDim2.new(0, 65, 0.5, -10)
     LogLocalToggle.BackgroundColor3 = config.neutralColor
     LogLocalToggle.Parent = LogLocalContainer
     
@@ -296,58 +272,53 @@ function AnimationLogger:Init()
     UICornerLogCircle.CornerRadius = UDim.new(1, 0)
     UICornerLogCircle.Parent = LogToggleCircle
     
-    local logLocalEnabled = false
-    local logLocalConnection = nil
+    -- Show Parried toggle with responsive layout
+    local ShowParriedContainer = Instance.new("Frame")
+    ShowParriedContainer.Name = "ShowParriedContainer"
+    ShowParriedContainer.Size = UDim2.new(0, 120, 0, 30)
+    ShowParriedContainer.BackgroundTransparency = 1
+    ShowParriedContainer.LayoutOrder = 4
+    ShowParriedContainer.Parent = TitleBar
     
-    LogLocalToggle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            logLocalEnabled = not logLocalEnabled
-            
-            -- Smooth animation for toggle
-            local targetPos = logLocalEnabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-            local targetColor = logLocalEnabled and config.accentColor or config.neutralColor
-            
-            game:GetService("TweenService"):Create(
-                LogToggleCircle, 
-                TweenInfo.new(config.toggleSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
-                {Position = targetPos}
-            ):Play()
-            
-            game:GetService("TweenService"):Create(
-                LogLocalToggle, 
-                TweenInfo.new(config.toggleSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
-                {BackgroundColor3 = targetColor}
-            ):Play()
-            
-            if logLocalEnabled then
-                -- Start logging local animations
-                logLocalConnection = run_service.Heartbeat:Connect(function()
-                    self:LogLocalAnimations()
-                end)
-            else
-                -- Stop logging local animations
-                if logLocalConnection then
-                    logLocalConnection:Disconnect()
-                    logLocalConnection = nil
-                end
-            end
-        end
-    end)
+    local ShowParriedLabel = Instance.new("TextLabel")
+    ShowParriedLabel.Name = "ShowParriedLabel"
+    ShowParriedLabel.Size = UDim2.new(0, 80, 1, 0)
+    ShowParriedLabel.Position = UDim2.new(0, 0, 0, 0)
+    ShowParriedLabel.BackgroundTransparency = 1
+    ShowParriedLabel.Text = "Show Parried"
+    ShowParriedLabel.TextColor3 = config.textColor
+    ShowParriedLabel.TextSize = 14
+    ShowParriedLabel.FontFace = font
+    ShowParriedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ShowParriedLabel.Parent = ShowParriedContainer
     
-    -- Create top buttons with smooth hover effects
-    self:CreateTopButton("Export", config.neutralColor, function()
-        self:ExportAnimations()
-    end, TopButtonsContainer)
+    local ShowParriedToggle = Instance.new("Frame")
+    ShowParriedToggle.Name = "ShowParriedToggle"
+    ShowParriedToggle.Size = UDim2.new(0, 40, 0, 20)
+    ShowParriedToggle.Position = UDim2.new(0, 80, 0.5, -10)
+    ShowParriedToggle.BackgroundColor3 = config.accentColor
+    ShowParriedToggle.Parent = ShowParriedContainer
     
-    self:CreateTopButton("Clear", config.neutralColor, function()
-        self:ClearLogs()
-    end, TopButtonsContainer)
+    local UICornerToggle = Instance.new("UICorner")
+    UICornerToggle.CornerRadius = UDim.new(1, 0)
+    UICornerToggle.Parent = ShowParriedToggle
+    
+    local ToggleCircle = Instance.new("Frame")
+    ToggleCircle.Name = "ToggleCircle"
+    ToggleCircle.Size = UDim2.new(0, 16, 0, 16)
+    ToggleCircle.Position = UDim2.new(1, -18, 0.5, -8)
+    ToggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleCircle.Parent = ShowParriedToggle
+    
+    local UICornerCircle = Instance.new("UICorner")
+    UICornerCircle.CornerRadius = UDim.new(1, 0)
+    UICornerCircle.Parent = ToggleCircle
     
     -- Close button
     local CloseButton = Instance.new("TextButton")
     CloseButton.Name = "CloseButton"
     CloseButton.Size = UDim2.new(0, 30, 0, 30)
-    CloseButton.Position = UDim2.new(1, -35, 0.5, -15)
+    CloseButton.Position = UDim2.new(1, -30, 0.5, -15)
     CloseButton.BackgroundTransparency = 1
     CloseButton.Text = "×"
     CloseButton.TextColor3 = config.textColor
@@ -414,6 +385,29 @@ function AnimationLogger:Init()
     
     -- Hook into animation events with the fixed method
     self:HookAnimations()
+    
+    -- Make UI responsive to size changes
+    MainFrame:GetPropertyChangedSignal("Size"):Connect(function()
+        -- Adjust button layout based on width
+        local width = MainFrame.Size.X.Offset
+        if width < 500 then
+            -- Compact mode for small UI
+            ButtonsLayout.Padding = UDim.new(0, 5)
+            LogLocalLabel.Size = UDim2.new(0, 50, 1, 0)
+            LogLocalToggle.Position = UDim2.new(0, 55, 0.5, -10)
+            ShowParriedLabel.Size = UDim2.new(0, 70, 1, 0)
+            ShowParriedToggle.Position = UDim2.new(0, 70, 0.5, -10)
+            Title.TextSize = 14
+        else
+            -- Normal mode for larger UI
+            ButtonsLayout.Padding = UDim.new(0, 10)
+            LogLocalLabel.Size = UDim2.new(0, 60, 1, 0)
+            LogLocalToggle.Position = UDim2.new(0, 65, 0.5, -10)
+            ShowParriedLabel.Size = UDim2.new(0, 80, 1, 0)
+            ShowParriedToggle.Position = UDim2.new(0, 80, 0.5, -10)
+            Title.TextSize = 16
+        end
+    end)
     
     return self
 end
@@ -681,7 +675,7 @@ function AnimationLogger:LogAnimation(animation)
     local LogEntry = Instance.new("Frame")
     LogEntry.Name = "LogEntry"
     LogEntry.Size = UDim2.new(1, 0, 0, 70) -- Reduced height to match screenshot
-    LogEntry.BackgroundColor3 = Color3.fromRGB(45, 35, 55) -- Purple background
+    LogEntry.BackgroundColor3 = Color3.fromRGB(45, 35, 55) -- Purple background for normal logs
     LogEntry.BorderSizePixel = 0
     LogEntry.Parent = LogContainer
     
@@ -689,7 +683,7 @@ function AnimationLogger:LogAnimation(animation)
     UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = LogEntry
     
-    -- Add square icon instead of X emoji
+    -- Add red square icon
     local IconFrame = Instance.new("Frame")
     IconFrame.Name = "IconFrame"
     IconFrame.Size = UDim2.new(0, 16, 0, 16)
@@ -701,10 +695,23 @@ function AnimationLogger:LogAnimation(animation)
     UICornerIcon.CornerRadius = UDim.new(0, 3)
     UICornerIcon.Parent = IconFrame
     
-    -- Animation name (properly aligned)
+    -- Best time label with proper alignment
+    local BestLabel = Instance.new("TextLabel")
+    BestLabel.Name = "BestLabel"
+    BestLabel.Size = UDim2.new(0, 200, 0, 20)
+    BestLabel.Position = UDim2.new(0, 32, 0, 8) -- Aligned with icon
+    BestLabel.BackgroundTransparency = 1
+    BestLabel.Text = "Best: " .. (timeStr ~= "" and timeStr or "Unknown")
+    BestLabel.TextColor3 = config.textColor
+    BestLabel.FontFace = self.font
+    BestLabel.TextSize = 14
+    BestLabel.TextXAlignment = Enum.TextXAlignment.Left
+    BestLabel.Parent = LogEntry
+    
+    -- Animation name with proper alignment
     local AnimNameLabel = Instance.new("TextLabel")
     AnimNameLabel.Name = "AnimNameLabel"
-    AnimNameLabel.Size = UDim2.new(0, 200, 0, 20)
+    AnimNameLabel.Size = UDim2.new(0.5, -40, 0, 20)
     AnimNameLabel.Position = UDim2.new(0, 32, 0, 8) -- Aligned with icon
     AnimNameLabel.BackgroundTransparency = 1
     AnimNameLabel.Text = animName
@@ -714,7 +721,7 @@ function AnimationLogger:LogAnimation(animation)
     AnimNameLabel.TextXAlignment = Enum.TextXAlignment.Left
     AnimNameLabel.Parent = LogEntry
     
-    -- Seen count label (properly aligned)
+    -- Seen count label with proper alignment
     local SeenLabel = Instance.new("TextLabel")
     SeenLabel.Name = "SeenLabel"
     SeenLabel.Size = UDim2.new(0, 100, 0, 20)
@@ -727,11 +734,11 @@ function AnimationLogger:LogAnimation(animation)
     SeenLabel.TextXAlignment = Enum.TextXAlignment.Left
     SeenLabel.Parent = LogEntry
     
-    -- Parried count label (properly aligned)
+    -- Parried count label with proper alignment
     local ParriedLabel = Instance.new("TextLabel")
     ParriedLabel.Name = "ParriedLabel"
     ParriedLabel.Size = UDim2.new(0, 100, 0, 20)
-    ParriedLabel.Position = UDim2.new(0, 10, 0, 45)
+    ParriedLabel.Position = UDim2.new(0, 10, 0, 50)
     ParriedLabel.BackgroundTransparency = 1
     ParriedLabel.Text = "Parried: " .. parriedCount .. "×"
     ParriedLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -740,10 +747,10 @@ function AnimationLogger:LogAnimation(animation)
     ParriedLabel.TextXAlignment = Enum.TextXAlignment.Left
     ParriedLabel.Parent = LogEntry
     
-    -- Animation ID (properly aligned)
+    -- Animation ID with proper alignment
     local AnimIdLabel = Instance.new("TextLabel")
     AnimIdLabel.Name = "AnimIdLabel"
-    AnimIdLabel.Size = UDim2.new(1, -20, 0, 20)
+    AnimIdLabel.Size = UDim2.new(0.5, -20, 0, 20)
     AnimIdLabel.Position = UDim2.new(0, 10, 1, -20) -- Bottom aligned
     AnimIdLabel.BackgroundTransparency = 1
     AnimIdLabel.Text = "ID: " .. animId
@@ -754,7 +761,21 @@ function AnimationLogger:LogAnimation(animation)
     AnimIdLabel.TextTruncate = Enum.TextTruncate.AtEnd
     AnimIdLabel.Parent = LogEntry
     
-    -- Buttons container (properly aligned)
+    -- Animation time with proper alignment
+    local TimeLabel = Instance.new("TextLabel")
+    TimeLabel.Name = "TimeLabel"
+    TimeLabel.Size = UDim2.new(0.5, -20, 0, 20)
+    TimeLabel.Position = UDim2.new(0.5, 10, 1, -20) -- Bottom right aligned
+    TimeLabel.BackgroundTransparency = 1
+    TimeLabel.Text = "Times: " .. (timeStr ~= "" and timeStr or "Unknown")
+    TimeLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    TimeLabel.FontFace = self.font
+    TimeLabel.TextSize = 12
+    TimeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TimeLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    TimeLabel.Parent = LogEntry
+    
+    -- Buttons container with proper alignment
     local ButtonsRow = Instance.new("Frame")
     ButtonsRow.Name = "ButtonsRow"
     ButtonsRow.Size = UDim2.new(0, 270, 0, 30)
@@ -778,7 +799,7 @@ function AnimationLogger:LogAnimation(animation)
         LogEntry:Destroy()
     end)
     
-    -- Retry button (properly aligned)
+    -- Retry button with proper alignment
     local RetryButton = self:CreateEntryButton("Retry", config.neutralColor, LogEntry, UDim2.new(0.5, -40, 1, -35), function()
         self:RetryAnimation(animId)
     end)
@@ -798,6 +819,22 @@ function AnimationLogger:LogAnimation(animation)
             TweenInfo.new(config.hoverSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
             {BackgroundColor3 = Color3.fromRGB(45, 35, 55)}
         ):Play()
+    end)
+    
+    -- Make text elements responsive to UI size changes
+    MainFrame:GetPropertyChangedSignal("Size"):Connect(function()
+        local width = MainFrame.Size.X.Offset
+        if width < 500 then
+            -- Compact mode for small UI
+            AnimNameLabel.Size = UDim2.new(0.4, -40, 0, 20)
+            ButtonsRow.Size = UDim2.new(0, 240, 0, 30)
+            ButtonsRow.Position = UDim2.new(1, -245, 0, 10)
+        else
+            -- Normal mode for larger UI
+            AnimNameLabel.Size = UDim2.new(0.5, -40, 0, 20)
+            ButtonsRow.Size = UDim2.new(0, 270, 0, 30)
+            ButtonsRow.Position = UDim2.new(1, -280, 0, 10)
+        end
     end)
     
     -- Limit the number of logs
@@ -1039,7 +1076,7 @@ function AnimationLogger:SetPosition(position)
     end
 end
 
--- Add a function to mark an animation as parried
+-- Add a function to mark an animation as parried with different color
 function AnimationLogger:MarkAsParried(animId)
     if not animId then return end
     
@@ -1054,6 +1091,23 @@ function AnimationLogger:MarkAsParried(animId)
                     local parriedLabel = child:FindFirstChild("ParriedLabel")
                     if parriedLabel then
                         parriedLabel.Text = "Parried: " .. entry.parried .. "×"
+                        
+                        -- Change background color to indicate parried animation
+                        game:GetService("TweenService"):Create(
+                            child, 
+                            TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                            {BackgroundColor3 = Color3.fromRGB(60, 40, 80)} -- Brighter purple for parried animations
+                        ):Play()
+                        
+                        -- Change icon color
+                        local icon = child:FindFirstChild("IconFrame")
+                        if icon then
+                            game:GetService("TweenService"):Create(
+                                icon, 
+                                TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                                {BackgroundColor3 = Color3.fromRGB(220, 80, 80)} -- Brighter red for parried animations
+                            ):Play()
+                        end
                     end
                     break
                 end
