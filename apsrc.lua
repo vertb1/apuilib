@@ -30,7 +30,9 @@ local config = {
     cornerRadius = UDim.new(0, 8),
     padding = UDim.new(0, 10),
     saveFileName = "AnimationBlacklist.json",
-    configFolder = "animation_logger"
+    configFolder = "animation_logger",
+    toggleSpeed = 0.2, -- Animation speed for toggles
+    hoverSpeed = 0.15  -- Animation speed for hover effects
 }
 
 -- Initialize the UI Library
@@ -220,7 +222,74 @@ function AnimationLogger:Init()
     UIListLayoutTop.Padding = UDim.new(0, 15)
     UIListLayoutTop.Parent = TopButtonsContainer
     
-    -- Log Local toggle (converted from button to toggle)
+    -- Show Parried toggle (renamed from Show All)
+    local ShowParriedContainer = Instance.new("Frame")
+    ShowParriedContainer.Name = "ShowParriedContainer"
+    ShowParriedContainer.Size = UDim2.new(0, 130, 0, 30)
+    ShowParriedContainer.BackgroundTransparency = 1
+    ShowParriedContainer.Parent = TopButtonsContainer
+    
+    local ShowParriedLabel = Instance.new("TextLabel")
+    ShowParriedLabel.Name = "ShowParriedLabel"
+    ShowParriedLabel.Size = UDim2.new(0, 90, 1, 0)
+    ShowParriedLabel.BackgroundTransparency = 1
+    ShowParriedLabel.Text = "Show Parried"
+    ShowParriedLabel.TextColor3 = config.textColor
+    ShowParriedLabel.TextSize = 14
+    ShowParriedLabel.FontFace = font
+    ShowParriedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ShowParriedLabel.Parent = ShowParriedContainer
+    
+    local ShowParriedToggle = Instance.new("Frame")
+    ShowParriedToggle.Name = "ShowParriedToggle"
+    ShowParriedToggle.Size = UDim2.new(0, 40, 0, 20)
+    ShowParriedToggle.Position = UDim2.new(0, 90, 0.5, -10)
+    ShowParriedToggle.BackgroundColor3 = config.accentColor
+    ShowParriedToggle.Parent = ShowParriedContainer
+    
+    local UICornerToggle = Instance.new("UICorner")
+    UICornerToggle.CornerRadius = UDim.new(1, 0)
+    UICornerToggle.Parent = ShowParriedToggle
+    
+    local ToggleCircle = Instance.new("Frame")
+    ToggleCircle.Name = "ToggleCircle"
+    ToggleCircle.Size = UDim2.new(0, 16, 0, 16)
+    ToggleCircle.Position = UDim2.new(1, -18, 0.5, -8)
+    ToggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleCircle.Parent = ShowParriedToggle
+    
+    local UICornerCircle = Instance.new("UICorner")
+    UICornerCircle.CornerRadius = UDim.new(1, 0)
+    UICornerCircle.Parent = ToggleCircle
+    
+    local showParriedEnabled = true
+    
+    ShowParriedToggle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            showParriedEnabled = not showParriedEnabled
+            
+            -- Smooth animation for toggle
+            local targetPos = showParriedEnabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+            local targetColor = showParriedEnabled and config.accentColor or Color3.fromRGB(80, 80, 100)
+            
+            game:GetService("TweenService"):Create(
+                ToggleCircle, 
+                TweenInfo.new(config.toggleSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                {Position = targetPos}
+            ):Play()
+            
+            game:GetService("TweenService"):Create(
+                ShowParriedToggle, 
+                TweenInfo.new(config.toggleSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                {BackgroundColor3 = targetColor}
+            ):Play()
+            
+            -- Filter logs to show only parried animations when toggle is off
+            self:FilterParriedLogs(showParriedEnabled)
+        end
+    end)
+    
+    -- Log Local toggle
     local LogLocalContainer = Instance.new("Frame")
     LogLocalContainer.Name = "LogLocalContainer"
     LogLocalContainer.Size = UDim2.new(0, 110, 0, 30)
@@ -266,18 +335,29 @@ function AnimationLogger:Init()
     LogLocalToggle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             logLocalEnabled = not logLocalEnabled
+            
+            -- Smooth animation for toggle
+            local targetPos = logLocalEnabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+            local targetColor = logLocalEnabled and config.accentColor or config.neutralColor
+            
+            game:GetService("TweenService"):Create(
+                LogToggleCircle, 
+                TweenInfo.new(config.toggleSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                {Position = targetPos}
+            ):Play()
+            
+            game:GetService("TweenService"):Create(
+                LogLocalToggle, 
+                TweenInfo.new(config.toggleSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                {BackgroundColor3 = targetColor}
+            ):Play()
+            
             if logLocalEnabled then
-                LogLocalToggle.BackgroundColor3 = config.accentColor
-                LogToggleCircle.Position = UDim2.new(1, -18, 0.5, -8)
-                
                 -- Start logging local animations
                 logLocalConnection = run_service.Heartbeat:Connect(function()
                     self:LogLocalAnimations()
                 end)
             else
-                LogLocalToggle.BackgroundColor3 = config.neutralColor
-                LogToggleCircle.Position = UDim2.new(0, 2, 0.5, -8)
-                
                 -- Stop logging local animations
                 if logLocalConnection then
                     logLocalConnection:Disconnect()
@@ -287,64 +367,7 @@ function AnimationLogger:Init()
         end
     end)
     
-    -- Show All toggle (fixed positioning)
-    local ShowAllContainer = Instance.new("Frame")
-    ShowAllContainer.Name = "ShowAllContainer"
-    ShowAllContainer.Size = UDim2.new(0, 110, 0, 30)
-    ShowAllContainer.BackgroundTransparency = 1
-    ShowAllContainer.Parent = TopButtonsContainer
-    
-    local ShowAllLabel = Instance.new("TextLabel")
-    ShowAllLabel.Name = "ShowAllLabel"
-    ShowAllLabel.Size = UDim2.new(0, 70, 1, 0)
-    ShowAllLabel.BackgroundTransparency = 1
-    ShowAllLabel.Text = "Show All"
-    ShowAllLabel.TextColor3 = config.textColor
-    ShowAllLabel.TextSize = 14
-    ShowAllLabel.FontFace = font
-    ShowAllLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ShowAllLabel.Parent = ShowAllContainer
-    
-    local ShowAllToggle = Instance.new("Frame")
-    ShowAllToggle.Name = "ShowAllToggle"
-    ShowAllToggle.Size = UDim2.new(0, 40, 0, 20)
-    ShowAllToggle.Position = UDim2.new(0, 70, 0.5, -10) -- Fixed position
-    ShowAllToggle.BackgroundColor3 = config.accentColor
-    ShowAllToggle.Parent = ShowAllContainer
-    
-    local UICornerToggle = Instance.new("UICorner")
-    UICornerToggle.CornerRadius = UDim.new(1, 0)
-    UICornerToggle.Parent = ShowAllToggle
-    
-    local ToggleCircle = Instance.new("Frame")
-    ToggleCircle.Name = "ToggleCircle"
-    ToggleCircle.Size = UDim2.new(0, 16, 0, 16)
-    ToggleCircle.Position = UDim2.new(1, -18, 0.5, -8)
-    ToggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleCircle.Parent = ShowAllToggle
-    
-    local UICornerCircle = Instance.new("UICorner")
-    UICornerCircle.CornerRadius = UDim.new(1, 0)
-    UICornerCircle.Parent = ToggleCircle
-    
-    local showAllEnabled = true
-    
-    ShowAllToggle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            showAllEnabled = not showAllEnabled
-            if showAllEnabled then
-                ShowAllToggle.BackgroundColor3 = config.accentColor
-                ToggleCircle.Position = UDim2.new(1, -18, 0.5, -8)
-            else
-                ShowAllToggle.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-                ToggleCircle.Position = UDim2.new(0, 2, 0.5, -8)
-            end
-            -- Implement filtering logic here
-            self:FilterLogs(showAllEnabled)
-        end
-    end)
-    
-    -- Create top buttons
+    -- Create top buttons with smooth hover effects
     self:CreateTopButton("Export", config.neutralColor, function()
         self:ExportAnimations()
     end, TopButtonsContainer)
@@ -428,7 +451,7 @@ function AnimationLogger:Init()
     return self
 end
 
--- Create a top button
+-- Create a top button with smooth hover effects
 function AnimationLogger:CreateTopButton(text, color, callback, parent)
     local Button = Instance.new("TextButton")
     Button.Name = text .. "Button"
@@ -444,17 +467,25 @@ function AnimationLogger:CreateTopButton(text, color, callback, parent)
     UICorner.CornerRadius = UDim.new(0, 4)
     UICorner.Parent = Button
     
-    -- Button hover effect
+    -- Smooth button hover effect
     Button.MouseEnter:Connect(function()
-        Button.BackgroundColor3 = Color3.new(
-            math.min(color.R * 1.1, 1),
-            math.min(color.G * 1.1, 1),
-            math.min(color.B * 1.1, 1)
-        )
+        game:GetService("TweenService"):Create(
+            Button, 
+            TweenInfo.new(config.hoverSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+            {BackgroundColor3 = Color3.new(
+                math.min(color.R * 1.1, 1),
+                math.min(color.G * 1.1, 1),
+                math.min(color.B * 1.1, 1)
+            )}
+        ):Play()
     end)
     
     Button.MouseLeave:Connect(function()
-        Button.BackgroundColor3 = color
+        game:GetService("TweenService"):Create(
+            Button, 
+            TweenInfo.new(config.hoverSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+            {BackgroundColor3 = color}
+        ):Play()
     end)
     
     Button.MouseButton1Click:Connect(callback)
@@ -462,7 +493,7 @@ function AnimationLogger:CreateTopButton(text, color, callback, parent)
     return Button
 end
 
--- Create a button for animation entries
+-- Create a button for animation entries with smooth hover effects
 function AnimationLogger:CreateEntryButton(text, color, parent, position, callback)
     local Button = Instance.new("TextButton")
     Button.Name = text .. "Button"
@@ -479,17 +510,25 @@ function AnimationLogger:CreateEntryButton(text, color, parent, position, callba
     UICorner.CornerRadius = UDim.new(0, 4)
     UICorner.Parent = Button
     
-    -- Button hover effect
+    -- Smooth button hover effect
     Button.MouseEnter:Connect(function()
-        Button.BackgroundColor3 = Color3.new(
-            math.min(color.R * 1.1, 1),
-            math.min(color.G * 1.1, 1),
-            math.min(color.B * 1.1, 1)
-        )
+        game:GetService("TweenService"):Create(
+            Button, 
+            TweenInfo.new(config.hoverSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+            {BackgroundColor3 = Color3.new(
+                math.min(color.R * 1.1, 1),
+                math.min(color.G * 1.1, 1),
+                math.min(color.B * 1.1, 1)
+            )}
+        ):Play()
     end)
     
     Button.MouseLeave:Connect(function()
-        Button.BackgroundColor3 = color
+        game:GetService("TweenService"):Create(
+            Button, 
+            TweenInfo.new(config.hoverSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+            {BackgroundColor3 = color}
+        ):Play()
     end)
     
     Button.MouseButton1Click:Connect(callback)
@@ -497,13 +536,23 @@ function AnimationLogger:CreateEntryButton(text, color, parent, position, callba
     return Button
 end
 
--- Filter logs based on Show All toggle
-function AnimationLogger:FilterLogs(showAll)
+-- Filter logs to show only parried animations when toggle is off
+function AnimationLogger:FilterParriedLogs(showAll)
     for _, child in pairs(LogContainer:GetChildren()) do
         if child:IsA("Frame") then
-            -- Implement your filtering logic here
-            -- For example, you might want to hide certain animations when showAll is false
-            child.Visible = showAll
+            local parriedLabel = child:FindFirstChild("ParriedLabel")
+            if parriedLabel then
+                -- If showAll is false, only show entries that have been parried
+                if not showAll then
+                    local parriedCount = tonumber(parriedLabel.Text:match("(%d+)"))
+                    child.Visible = parriedCount and parriedCount > 0
+                else
+                    child.Visible = true
+                end
+            else
+                -- If no parried label, follow the showAll setting
+                child.Visible = showAll
+            end
         end
     end
 end
@@ -538,7 +587,7 @@ function AnimationLogger:LogLocalAnimations()
     end
 end
 
--- Log an animation
+-- Log an animation with improved styling to match the screenshot
 function AnimationLogger:LogAnimation(animation)
     if not animation or not animation.AnimationId then return end
     
@@ -547,8 +596,9 @@ function AnimationLogger:LogAnimation(animation)
     -- Check if animation is blacklisted
     if self:IsBlacklisted(animId) then return end
     
-    -- Extract animation name from ID if possible
+    -- Extract animation name and timing information
     local animName = "Unknown Animation"
+    local animTime = 0
     local success, result = pcall(function()
         return game:GetService("MarketplaceService"):GetProductInfo(tonumber(animId:match("%d+")))
     end)
@@ -566,17 +616,45 @@ function AnimationLogger:LogAnimation(animation)
         end
     end
     
+    -- Try to get animation length
+    local animInstance = Instance.new("Animation")
+    animInstance.AnimationId = animId
+    
+    local humanoid = players.LocalPlayer and players.LocalPlayer.Character and players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        local success, animTrack = pcall(function()
+            return humanoid:LoadAnimation(animInstance)
+        end)
+        
+        if success and animTrack then
+            animTime = animTrack.Length
+            animTrack:Stop()
+            animTrack:Destroy()
+        end
+    end
+    
+    -- Format animation time
+    local timeStr = ""
+    if animTime > 0 then
+        local seconds = math.floor(animTime)
+        local ms = math.floor((animTime - seconds) * 1000)
+        timeStr = string.format("%.2fs (%dms)", animTime, ms)
+    end
+    
     -- Add to animation list if not already present
     local alreadyLogged = false
+    local parriedCount = 0
+    
     for _, entry in pairs(AnimationList) do
         if entry.id == animId then
             entry.count = entry.count + 1
             alreadyLogged = true
+            parriedCount = entry.parried or 0
             
             -- Update count in UI if entry exists
             for _, child in pairs(LogContainer:GetChildren()) do
                 if child:IsA("Frame") and child:FindFirstChild("AnimIdLabel") and child.AnimIdLabel.Text:find(animId, 1, true) then
-                    local countLabel = child:FindFirstChild("CountLabel")
+                    local countLabel = child:FindFirstChild("SeenLabel")
                     if countLabel then
                         countLabel.Text = "Seen: " .. entry.count .. "×"
                     end
@@ -588,70 +666,99 @@ function AnimationLogger:LogAnimation(animation)
     end
     
     if not alreadyLogged then
-        table.insert(AnimationList, {id = animId, name = animName, count = 1})
+        table.insert(AnimationList, {
+            id = animId, 
+            name = animName, 
+            count = 1, 
+            parried = 0,
+            time = animTime
+        })
     else
         return -- Don't create a new entry if already logged
     end
     
-    -- Create log entry with modern styling
+    -- Create log entry with styling matching the screenshot
     local LogEntry = Instance.new("Frame")
     LogEntry.Name = "LogEntry"
     LogEntry.Size = UDim2.new(1, 0, 0, 80)
-    LogEntry.BackgroundColor3 = config.entryColor
+    LogEntry.BackgroundColor3 = Color3.fromRGB(45, 35, 55) -- Purple background like in screenshot
     LogEntry.BorderSizePixel = 0
     LogEntry.Parent = LogContainer
-    
-    -- Add subtle gradient for modern look
-    local UIGradient = Instance.new("UIGradient")
-    UIGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 45, 60)),
-        ColorSequenceKeypoint.new(1, config.entryColor)
-    })
-    UIGradient.Rotation = 90
-    UIGradient.Parent = LogEntry
     
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = LogEntry
     
-    -- Add subtle stroke
-    local UIStroke = Instance.new("UIStroke")
-    UIStroke.Color = Color3.fromRGB(60, 60, 80)
-    UIStroke.Thickness = 1
-    UIStroke.Transparency = 0.7
-    UIStroke.Parent = LogEntry
+    -- Add X icon
+    local XIcon = Instance.new("TextLabel")
+    XIcon.Name = "XIcon"
+    XIcon.Size = UDim2.new(0, 20, 0, 20)
+    XIcon.Position = UDim2.new(0, 10, 0, 10)
+    XIcon.BackgroundTransparency = 1
+    XIcon.Text = "✕"
+    XIcon.TextColor3 = Color3.fromRGB(255, 100, 100)
+    XIcon.TextSize = 16
+    XIcon.FontFace = self.font
+    XIcon.TextXAlignment = Enum.TextXAlignment.Left
+    XIcon.Parent = LogEntry
     
-    -- Count label
-    local CountLabel = Instance.new("TextLabel")
-    CountLabel.Name = "CountLabel"
-    CountLabel.Size = UDim2.new(0, 100, 0, 20)
-    CountLabel.Position = UDim2.new(0, 12, 0, 8)
-    CountLabel.BackgroundTransparency = 1
-    CountLabel.Text = "Seen: 1×"
-    CountLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    CountLabel.FontFace = self.font
-    CountLabel.TextSize = 12
-    CountLabel.TextXAlignment = Enum.TextXAlignment.Left
-    CountLabel.Parent = LogEntry
+    -- Best time label
+    local BestTimeLabel = Instance.new("TextLabel")
+    BestTimeLabel.Name = "BestTimeLabel"
+    BestTimeLabel.Size = UDim2.new(0, 200, 0, 20)
+    BestTimeLabel.Position = UDim2.new(0, 30, 0, 10)
+    BestTimeLabel.BackgroundTransparency = 1
+    BestTimeLabel.Text = "Best: " .. (timeStr ~= "" and timeStr or "Unknown")
+    BestTimeLabel.TextColor3 = config.textColor
+    BestTimeLabel.FontFace = self.font
+    BestTimeLabel.TextSize = 14
+    BestTimeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    BestTimeLabel.Parent = LogEntry
     
     -- Animation name
     local AnimNameLabel = Instance.new("TextLabel")
     AnimNameLabel.Name = "AnimNameLabel"
-    AnimNameLabel.Size = UDim2.new(1, -24, 0, 20)
-    AnimNameLabel.Position = UDim2.new(0, 12, 0, 28)
+    AnimNameLabel.Size = UDim2.new(0.5, -40, 0, 20)
+    AnimNameLabel.Position = UDim2.new(0, 30, 0, 10)
     AnimNameLabel.BackgroundTransparency = 1
     AnimNameLabel.Text = animName
     AnimNameLabel.TextColor3 = config.textColor
     AnimNameLabel.FontFace = self.font
-    AnimNameLabel.TextSize = 16
+    AnimNameLabel.TextSize = 14
     AnimNameLabel.TextXAlignment = Enum.TextXAlignment.Left
     AnimNameLabel.Parent = LogEntry
+    
+    -- Seen count label
+    local SeenLabel = Instance.new("TextLabel")
+    SeenLabel.Name = "SeenLabel"
+    SeenLabel.Size = UDim2.new(0, 100, 0, 20)
+    SeenLabel.Position = UDim2.new(0, 10, 0, 30)
+    SeenLabel.BackgroundTransparency = 1
+    SeenLabel.Text = "Seen: 1×"
+    SeenLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    SeenLabel.FontFace = self.font
+    SeenLabel.TextSize = 12
+    SeenLabel.TextXAlignment = Enum.TextXAlignment.Left
+    SeenLabel.Parent = LogEntry
+    
+    -- Parried count label
+    local ParriedLabel = Instance.new("TextLabel")
+    ParriedLabel.Name = "ParriedLabel"
+    ParriedLabel.Size = UDim2.new(0, 100, 0, 20)
+    ParriedLabel.Position = UDim2.new(0, 10, 0, 50)
+    ParriedLabel.BackgroundTransparency = 1
+    ParriedLabel.Text = "Parried: 0×"
+    ParriedLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    ParriedLabel.FontFace = self.font
+    ParriedLabel.TextSize = 12
+    ParriedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ParriedLabel.Parent = LogEntry
     
     -- Animation ID
     local AnimIdLabel = Instance.new("TextLabel")
     AnimIdLabel.Name = "AnimIdLabel"
-    AnimIdLabel.Size = UDim2.new(1, -24, 0, 20)
-    AnimIdLabel.Position = UDim2.new(0, 12, 0, 48)
+    AnimIdLabel.Size = UDim2.new(0.5, -20, 0, 20)
+    AnimIdLabel.Position = UDim2.new(0, 10, 0, 70)
     AnimIdLabel.BackgroundTransparency = 1
     AnimIdLabel.Text = "ID: " .. animId
     AnimIdLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -661,11 +768,24 @@ function AnimationLogger:LogAnimation(animation)
     AnimIdLabel.TextTruncate = Enum.TextTruncate.AtEnd
     AnimIdLabel.Parent = LogEntry
     
-    -- Buttons container with auto-width adjustment
+    -- Animation time
+    local TimeLabel = Instance.new("TextLabel")
+    TimeLabel.Name = "TimeLabel"
+    TimeLabel.Size = UDim2.new(0.5, -20, 0, 20)
+    TimeLabel.Position = UDim2.new(0.5, 10, 0, 70)
+    TimeLabel.BackgroundTransparency = 1
+    TimeLabel.Text = "Times: " .. (timeStr ~= "" and timeStr or "Unknown")
+    TimeLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    TimeLabel.FontFace = self.font
+    TimeLabel.TextSize = 12
+    TimeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TimeLabel.Parent = LogEntry
+    
+    -- Buttons container
     local ButtonsRow = Instance.new("Frame")
     ButtonsRow.Name = "ButtonsRow"
     ButtonsRow.Size = UDim2.new(0, 270, 0, 30)
-    ButtonsRow.Position = UDim2.new(1, -280, 0.5, -15)
+    ButtonsRow.Position = UDim2.new(1, -280, 0, 10)
     ButtonsRow.BackgroundTransparency = 1
     ButtonsRow.Parent = LogEntry
     
@@ -685,22 +805,26 @@ function AnimationLogger:LogAnimation(animation)
         LogEntry:Destroy()
     end)
     
-    -- Retry button with modern styling
+    -- Retry button
     local RetryButton = self:CreateEntryButton("Retry", config.neutralColor, LogEntry, UDim2.new(0.5, -40, 1, -35), function()
         self:RetryAnimation(animId)
     end)
     
-    -- Add hover effect to the entire entry
+    -- Add smooth hover effect to the entire entry
     LogEntry.MouseEnter:Connect(function()
-        game:GetService("TweenService"):Create(LogEntry, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-        }):Play()
+        game:GetService("TweenService"):Create(
+            LogEntry, 
+            TweenInfo.new(config.hoverSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+            {BackgroundColor3 = Color3.fromRGB(55, 45, 65)}
+        ):Play()
     end)
     
     LogEntry.MouseLeave:Connect(function()
-        game:GetService("TweenService"):Create(LogEntry, TweenInfo.new(0.2), {
-            BackgroundColor3 = config.entryColor
-        }):Play()
+        game:GetService("TweenService"):Create(
+            LogEntry, 
+            TweenInfo.new(config.hoverSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+            {BackgroundColor3 = Color3.fromRGB(45, 35, 55)}
+        ):Play()
     end)
     
     -- Limit the number of logs
@@ -733,7 +857,7 @@ function AnimationLogger:SaveConfig(animId, animName)
     end
 end
 
--- Retry playing an animation
+-- Retry playing an animation with smooth feedback
 function AnimationLogger:RetryAnimation(animId)
     local player = players.LocalPlayer
     if not player or not player.Character then return end
@@ -746,9 +870,39 @@ function AnimationLogger:RetryAnimation(animId)
     
     local animTrack = humanoid:LoadAnimation(animation)
     animTrack:Play()
+    
+    -- Visual feedback for retry button
+    for _, child in pairs(LogContainer:GetChildren()) do
+        if child:IsA("Frame") and child:FindFirstChild("AnimIdLabel") and child.AnimIdLabel.Text:find(animId, 1, true) then
+            local retryButton = child:FindFirstChild("RetryButton")
+            if retryButton then
+                local originalColor = retryButton.BackgroundColor3
+                
+                game:GetService("TweenService"):Create(
+                    retryButton, 
+                    TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                    {BackgroundColor3 = config.accentColor}
+                ):Play()
+                
+                task.delay(0.5, function()
+                    game:GetService("TweenService"):Create(
+                        retryButton, 
+                        TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                        {BackgroundColor3 = originalColor}
+                    ):Play()
+                end)
+            end
+            break
+        end
+    end
+    
+    -- Simulate a parry for testing (in a real implementation, this would be triggered by game events)
+    task.delay(0.5, function()
+        self:MarkAsParried(animId)
+    end)
 end
 
--- Hook into animation events with the fixed method
+-- Hook into animation events with improved error handling
 function AnimationLogger:HookAnimations()
     local player = players.LocalPlayer
     if not player then return end
@@ -778,7 +932,7 @@ function AnimationLogger:HookAnimations()
             end
         end)
         
-        -- Monitor animation playing
+        -- Monitor animation playing with smooth transitions
         humanoid.AnimationPlayed:Connect(function(animTrack)
             self:LogAnimation(animTrack.Animation)
         end)
@@ -793,23 +947,66 @@ function AnimationLogger:HookAnimations()
     player.CharacterAdded:Connect(hookCharacter)
 end
 
--- Clear all logs
+-- Clear all logs with smooth animation
 function AnimationLogger:ClearLogs()
     for _, child in pairs(LogContainer:GetChildren()) do
         if child:IsA("Frame") then
-            child:Destroy()
+            -- Fade out animation
+            game:GetService("TweenService"):Create(
+                child, 
+                TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0)}
+            ):Play()
+            
+            -- Destroy after animation
+            task.delay(0.3, function()
+                child:Destroy()
+            end)
         end
     end
     AnimationList = {}
 end
 
--- Export animations
+-- Export animations with visual feedback
 function AnimationLogger:ExportAnimations()
     local exportText = ""
     for _, anim in pairs(AnimationList) do
-        exportText = exportText .. anim.name .. " - " .. anim.id .. "\n"
+        local parriedText = anim.parried and anim.parried > 0 and " (Parried: " .. anim.parried .. "×)" or ""
+        exportText = exportText .. anim.name .. parriedText .. " - " .. anim.id .. "\n"
     end
     setclipboard(exportText)
+    
+    -- Visual feedback
+    local exportButton = nil
+    for _, child in pairs(game:GetService("Players").LocalPlayer.PlayerGui:GetDescendants()) do
+        if child.Name == "ExportButton" then
+            exportButton = child
+            break
+        end
+    end
+    
+    if exportButton then
+        local originalText = exportButton.Text
+        local originalColor = exportButton.BackgroundColor3
+        
+        exportButton.Text = "Copied!"
+        
+        game:GetService("TweenService"):Create(
+            exportButton, 
+            TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+            {BackgroundColor3 = config.accentColor}
+        ):Play()
+        
+        task.delay(1, function()
+            exportButton.Text = originalText
+            
+            game:GetService("TweenService"):Create(
+                exportButton, 
+                TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+                {BackgroundColor3 = originalColor}
+            ):Play()
+        end)
+    end
 end
 
 -- Blacklist an animation
@@ -866,6 +1063,46 @@ end
 function AnimationLogger:SetPosition(position)
     if MainFrame then
         MainFrame.Position = position
+    end
+end
+
+-- Add a function to mark an animation as parried
+function AnimationLogger:MarkAsParried(animId)
+    if not animId then return end
+    
+    -- Update the animation list
+    for _, entry in pairs(AnimationList) do
+        if entry.id == animId then
+            entry.parried = (entry.parried or 0) + 1
+            
+            -- Update UI if entry exists
+            for _, child in pairs(LogContainer:GetChildren()) do
+                if child:IsA("Frame") and child:FindFirstChild("AnimIdLabel") and child.AnimIdLabel.Text:find(animId, 1, true) then
+                    local parriedLabel = child:FindFirstChild("ParriedLabel")
+                    if parriedLabel then
+                        parriedLabel.Text = "Parried: " .. entry.parried .. "×"
+                    end
+                    break
+                end
+            end
+            break
+        end
+    end
+    
+    -- Apply filtering if Show Parried toggle is off
+    local showParriedToggle = nil
+    for _, child in pairs(game:GetService("Players").LocalPlayer.PlayerGui:GetDescendants()) do
+        if child.Name == "ShowParriedToggle" then
+            showParriedToggle = child
+            break
+        end
+    end
+    
+    if showParriedToggle then
+        local showAll = showParriedToggle.BackgroundColor3 == config.accentColor
+        if not showAll then
+            self:FilterParriedLogs(false)
+        end
     end
 end
 
