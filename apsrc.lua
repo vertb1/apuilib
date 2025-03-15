@@ -15,8 +15,8 @@ local BlacklistedAnimations = {}
 
 -- Configuration
 local config = {
-    uiSize = UDim2.new(0, 500, 0, 400),
-    uiPosition = UDim2.new(0.5, -250, 0.5, -200),
+    uiSize = UDim2.new(0, 600, 0, 400),
+    uiPosition = UDim2.new(0.5, -300, 0.5, -200),
     backgroundColor = Color3.fromRGB(30, 30, 40),
     textColor = Color3.fromRGB(255, 255, 255),
     buttonColor = Color3.fromRGB(60, 60, 80),
@@ -27,8 +27,8 @@ local config = {
     entryColor = Color3.fromRGB(40, 40, 55),
     maxLogs = 100,
     fontSize = 14,
-    cornerRadius = UDim.new(0, 6),
-    padding = UDim.new(0, 8),
+    cornerRadius = UDim.new(0, 8),
+    padding = UDim.new(0, 10),
     saveFileName = "AnimationBlacklist.json",
     configFolder = "animation_logger"
 }
@@ -103,12 +103,27 @@ function AnimationLogger:Init()
     UICorner.CornerRadius = config.cornerRadius
     UICorner.Parent = MainFrame
     
+    -- Add drop shadow for modern look
+    local DropShadow = Instance.new("ImageLabel")
+    DropShadow.Name = "DropShadow"
+    DropShadow.AnchorPoint = Vector2.new(0.5, 0.5)
+    DropShadow.BackgroundTransparency = 1
+    DropShadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    DropShadow.Size = UDim2.new(1, 40, 1, 40)
+    DropShadow.ZIndex = 0
+    DropShadow.Image = "rbxassetid://6014261993"
+    DropShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    DropShadow.ImageTransparency = 0.5
+    DropShadow.ScaleType = Enum.ScaleType.Slice
+    DropShadow.SliceCenter = Rect.new(49, 49, 450, 450)
+    DropShadow.Parent = MainFrame
+    
     -- Add resize handle
     local ResizeHandle = Instance.new("TextButton")
     ResizeHandle.Name = "ResizeHandle"
-    ResizeHandle.Size = UDim2.new(0, 15, 0, 15)
-    ResizeHandle.Position = UDim2.new(1, -15, 1, -15)
-    ResizeHandle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    ResizeHandle.Size = UDim2.new(0, 18, 0, 18)
+    ResizeHandle.Position = UDim2.new(1, -18, 1, -18)
+    ResizeHandle.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
     ResizeHandle.Text = ""
     ResizeHandle.AutoButtonColor = false
     ResizeHandle.ZIndex = 10
@@ -118,7 +133,7 @@ function AnimationLogger:Init()
     UICornerResize.CornerRadius = UDim.new(0, 3)
     UICornerResize.Parent = ResizeHandle
     
-    -- Resize functionality
+    -- Resize functionality with auto-width adjustment
     local resizing = false
     local startPos, startSize
     
@@ -139,11 +154,16 @@ function AnimationLogger:Init()
             local delta = game:GetService("UserInputService"):GetMouseLocation() - startPos
             local newSize = UDim2.new(
                 startSize.X.Scale,
-                math.max(300, startSize.X.Offset + delta.X),
+                math.max(400, startSize.X.Offset + delta.X),
                 startSize.Y.Scale,
-                math.max(200, startSize.Y.Offset + delta.Y)
+                math.max(250, startSize.Y.Offset + delta.Y)
             )
             MainFrame.Size = newSize
+            
+            -- Auto-adjust log container width
+            if LogContainer then
+                LogContainer.Size = UDim2.new(1, -20, 1, -50)
+            end
         end
     end)
     
@@ -156,7 +176,7 @@ function AnimationLogger:Init()
     TitleBar.Parent = MainFrame
     
     local UICornerTitle = Instance.new("UICorner")
-    UICornerTitle.CornerRadius = UDim.new(0, 6)
+    UICornerTitle.CornerRadius = UDim.new(0, 8)
     UICornerTitle.Parent = TitleBar
     
     -- Create title
@@ -172,6 +192,19 @@ function AnimationLogger:Init()
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TitleBar
     
+    -- Create credits
+    local Credits = Instance.new("TextLabel")
+    Credits.Name = "Credits"
+    Credits.Size = UDim2.new(0, 100, 0, 20)
+    Credits.Position = UDim2.new(0, 15, 1, -20)
+    Credits.BackgroundTransparency = 1
+    Credits.Text = "by vertb1"
+    Credits.TextColor3 = Color3.fromRGB(150, 150, 150)
+    Credits.TextSize = 12
+    Credits.FontFace = font
+    Credits.TextXAlignment = Enum.TextXAlignment.Left
+    Credits.Parent = TitleBar
+    
     -- Create top buttons
     local TopButtonsContainer = Instance.new("Frame")
     TopButtonsContainer.Name = "TopButtonsContainer"
@@ -184,13 +217,80 @@ function AnimationLogger:Init()
     UIListLayoutTop.FillDirection = Enum.FillDirection.Horizontal
     UIListLayoutTop.HorizontalAlignment = Enum.HorizontalAlignment.Left
     UIListLayoutTop.VerticalAlignment = Enum.VerticalAlignment.Center
-    UIListLayoutTop.Padding = UDim.new(0, 10)
+    UIListLayoutTop.Padding = UDim.new(0, 15)
     UIListLayoutTop.Parent = TopButtonsContainer
+    
+    -- Log Local toggle (converted from button to toggle)
+    local LogLocalContainer = Instance.new("Frame")
+    LogLocalContainer.Name = "LogLocalContainer"
+    LogLocalContainer.Size = UDim2.new(0, 110, 0, 30)
+    LogLocalContainer.BackgroundTransparency = 1
+    LogLocalContainer.Parent = TopButtonsContainer
+    
+    local LogLocalLabel = Instance.new("TextLabel")
+    LogLocalLabel.Name = "LogLocalLabel"
+    LogLocalLabel.Size = UDim2.new(0, 70, 1, 0)
+    LogLocalLabel.BackgroundTransparency = 1
+    LogLocalLabel.Text = "Log Local"
+    LogLocalLabel.TextColor3 = config.textColor
+    LogLocalLabel.TextSize = 14
+    LogLocalLabel.FontFace = font
+    LogLocalLabel.TextXAlignment = Enum.TextXAlignment.Left
+    LogLocalLabel.Parent = LogLocalContainer
+    
+    local LogLocalToggle = Instance.new("Frame")
+    LogLocalToggle.Name = "LogLocalToggle"
+    LogLocalToggle.Size = UDim2.new(0, 40, 0, 20)
+    LogLocalToggle.Position = UDim2.new(0, 70, 0.5, -10)
+    LogLocalToggle.BackgroundColor3 = config.neutralColor
+    LogLocalToggle.Parent = LogLocalContainer
+    
+    local UICornerLogToggle = Instance.new("UICorner")
+    UICornerLogToggle.CornerRadius = UDim.new(1, 0)
+    UICornerLogToggle.Parent = LogLocalToggle
+    
+    local LogToggleCircle = Instance.new("Frame")
+    LogToggleCircle.Name = "ToggleCircle"
+    LogToggleCircle.Size = UDim2.new(0, 16, 0, 16)
+    LogToggleCircle.Position = UDim2.new(0, 2, 0.5, -8)
+    LogToggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    LogToggleCircle.Parent = LogLocalToggle
+    
+    local UICornerLogCircle = Instance.new("UICorner")
+    UICornerLogCircle.CornerRadius = UDim.new(1, 0)
+    UICornerLogCircle.Parent = LogToggleCircle
+    
+    local logLocalEnabled = false
+    local logLocalConnection = nil
+    
+    LogLocalToggle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            logLocalEnabled = not logLocalEnabled
+            if logLocalEnabled then
+                LogLocalToggle.BackgroundColor3 = config.accentColor
+                LogToggleCircle.Position = UDim2.new(1, -18, 0.5, -8)
+                
+                -- Start logging local animations
+                logLocalConnection = run_service.Heartbeat:Connect(function()
+                    self:LogLocalAnimations()
+                end)
+            else
+                LogLocalToggle.BackgroundColor3 = config.neutralColor
+                LogToggleCircle.Position = UDim2.new(0, 2, 0.5, -8)
+                
+                -- Stop logging local animations
+                if logLocalConnection then
+                    logLocalConnection:Disconnect()
+                    logLocalConnection = nil
+                end
+            end
+        end
+    end)
     
     -- Show All toggle (fixed positioning)
     local ShowAllContainer = Instance.new("Frame")
     ShowAllContainer.Name = "ShowAllContainer"
-    ShowAllContainer.Size = UDim2.new(0, 100, 0, 30)
+    ShowAllContainer.Size = UDim2.new(0, 110, 0, 30)
     ShowAllContainer.BackgroundTransparency = 1
     ShowAllContainer.Parent = TopButtonsContainer
     
@@ -208,7 +308,7 @@ function AnimationLogger:Init()
     local ShowAllToggle = Instance.new("Frame")
     ShowAllToggle.Name = "ShowAllToggle"
     ShowAllToggle.Size = UDim2.new(0, 40, 0, 20)
-    ShowAllToggle.Position = UDim2.new(0, 60, 0.5, -10) -- Fixed position
+    ShowAllToggle.Position = UDim2.new(0, 70, 0.5, -10) -- Fixed position
     ShowAllToggle.BackgroundColor3 = config.accentColor
     ShowAllToggle.Parent = ShowAllContainer
     
@@ -245,10 +345,6 @@ function AnimationLogger:Init()
     end)
     
     -- Create top buttons
-    self:CreateTopButton("Log Local", config.neutralColor, function()
-        self:LogLocalAnimations()
-    end, TopButtonsContainer)
-    
     self:CreateTopButton("Export", config.neutralColor, function()
         self:ExportAnimations()
     end, TopButtonsContainer)
@@ -273,7 +369,7 @@ function AnimationLogger:Init()
         ScreenGui.Enabled = false
     end)
     
-    -- Create log container
+    -- Create log container with auto-width
     LogContainer = Instance.new("ScrollingFrame")
     LogContainer.Name = "LogContainer"
     LogContainer.Size = UDim2.new(1, -20, 1, -50)
@@ -287,14 +383,14 @@ function AnimationLogger:Init()
     LogContainer.Parent = MainFrame
     
     local UIListLayout = Instance.new("UIListLayout")
-    UIListLayout.Padding = UDim.new(0, 8)
+    UIListLayout.Padding = UDim.new(0, 10)
     UIListLayout.Parent = LogContainer
     
     local UIPadding = Instance.new("UIPadding")
-    UIPadding.PaddingLeft = UDim.new(0, 5)
-    UIPadding.PaddingRight = UDim.new(0, 5)
-    UIPadding.PaddingTop = UDim.new(0, 5)
-    UIPadding.PaddingBottom = UDim.new(0, 5)
+    UIPadding.PaddingLeft = UDim.new(0, 8)
+    UIPadding.PaddingRight = UDim.new(0, 8)
+    UIPadding.PaddingTop = UDim.new(0, 8)
+    UIPadding.PaddingBottom = UDim.new(0, 8)
     UIPadding.Parent = LogContainer
     
     -- Add accent line
@@ -497,23 +593,39 @@ function AnimationLogger:LogAnimation(animation)
         return -- Don't create a new entry if already logged
     end
     
-    -- Create log entry
+    -- Create log entry with modern styling
     local LogEntry = Instance.new("Frame")
     LogEntry.Name = "LogEntry"
-    LogEntry.Size = UDim2.new(1, 0, 0, 75)
+    LogEntry.Size = UDim2.new(1, 0, 0, 80)
     LogEntry.BackgroundColor3 = config.entryColor
     LogEntry.BorderSizePixel = 0
     LogEntry.Parent = LogContainer
     
+    -- Add subtle gradient for modern look
+    local UIGradient = Instance.new("UIGradient")
+    UIGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 45, 60)),
+        ColorSequenceKeypoint.new(1, config.entryColor)
+    })
+    UIGradient.Rotation = 90
+    UIGradient.Parent = LogEntry
+    
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 6)
+    UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = LogEntry
+    
+    -- Add subtle stroke
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Color = Color3.fromRGB(60, 60, 80)
+    UIStroke.Thickness = 1
+    UIStroke.Transparency = 0.7
+    UIStroke.Parent = LogEntry
     
     -- Count label
     local CountLabel = Instance.new("TextLabel")
     CountLabel.Name = "CountLabel"
     CountLabel.Size = UDim2.new(0, 100, 0, 20)
-    CountLabel.Position = UDim2.new(0, 10, 0, 5)
+    CountLabel.Position = UDim2.new(0, 12, 0, 8)
     CountLabel.BackgroundTransparency = 1
     CountLabel.Text = "Seen: 1×"
     CountLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -525,8 +637,8 @@ function AnimationLogger:LogAnimation(animation)
     -- Animation name
     local AnimNameLabel = Instance.new("TextLabel")
     AnimNameLabel.Name = "AnimNameLabel"
-    AnimNameLabel.Size = UDim2.new(1, -20, 0, 20)
-    AnimNameLabel.Position = UDim2.new(0, 10, 0, 25)
+    AnimNameLabel.Size = UDim2.new(1, -24, 0, 20)
+    AnimNameLabel.Position = UDim2.new(0, 12, 0, 28)
     AnimNameLabel.BackgroundTransparency = 1
     AnimNameLabel.Text = animName
     AnimNameLabel.TextColor3 = config.textColor
@@ -538,8 +650,8 @@ function AnimationLogger:LogAnimation(animation)
     -- Animation ID
     local AnimIdLabel = Instance.new("TextLabel")
     AnimIdLabel.Name = "AnimIdLabel"
-    AnimIdLabel.Size = UDim2.new(1, -20, 0, 20)
-    AnimIdLabel.Position = UDim2.new(0, 10, 0, 45)
+    AnimIdLabel.Size = UDim2.new(1, -24, 0, 20)
+    AnimIdLabel.Position = UDim2.new(0, 12, 0, 48)
     AnimIdLabel.BackgroundTransparency = 1
     AnimIdLabel.Text = "ID: " .. animId
     AnimIdLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -549,7 +661,7 @@ function AnimationLogger:LogAnimation(animation)
     AnimIdLabel.TextTruncate = Enum.TextTruncate.AtEnd
     AnimIdLabel.Parent = LogEntry
     
-    -- Buttons container
+    -- Buttons container with auto-width adjustment
     local ButtonsRow = Instance.new("Frame")
     ButtonsRow.Name = "ButtonsRow"
     ButtonsRow.Size = UDim2.new(0, 270, 0, 30)
@@ -573,9 +685,22 @@ function AnimationLogger:LogAnimation(animation)
         LogEntry:Destroy()
     end)
     
-    -- Retry button
-    self:CreateEntryButton("Retry", config.neutralColor, LogEntry, UDim2.new(0.5, -40, 1, -30), function()
+    -- Retry button with modern styling
+    local RetryButton = self:CreateEntryButton("Retry", config.neutralColor, LogEntry, UDim2.new(0.5, -40, 1, -35), function()
         self:RetryAnimation(animId)
+    end)
+    
+    -- Add hover effect to the entire entry
+    LogEntry.MouseEnter:Connect(function()
+        game:GetService("TweenService"):Create(LogEntry, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+        }):Play()
+    end)
+    
+    LogEntry.MouseLeave:Connect(function()
+        game:GetService("TweenService"):Create(LogEntry, TweenInfo.new(0.2), {
+            BackgroundColor3 = config.entryColor
+        }):Play()
     end)
     
     -- Limit the number of logs
