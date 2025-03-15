@@ -103,6 +103,50 @@ function AnimationLogger:Init()
     UICorner.CornerRadius = config.cornerRadius
     UICorner.Parent = MainFrame
     
+    -- Add resize handle
+    local ResizeHandle = Instance.new("TextButton")
+    ResizeHandle.Name = "ResizeHandle"
+    ResizeHandle.Size = UDim2.new(0, 15, 0, 15)
+    ResizeHandle.Position = UDim2.new(1, -15, 1, -15)
+    ResizeHandle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    ResizeHandle.Text = ""
+    ResizeHandle.AutoButtonColor = false
+    ResizeHandle.ZIndex = 10
+    ResizeHandle.Parent = MainFrame
+    
+    local UICornerResize = Instance.new("UICorner")
+    UICornerResize.CornerRadius = UDim.new(0, 3)
+    UICornerResize.Parent = ResizeHandle
+    
+    -- Resize functionality
+    local resizing = false
+    local startPos, startSize
+    
+    ResizeHandle.MouseButton1Down:Connect(function()
+        resizing = true
+        startPos = game:GetService("UserInputService"):GetMouseLocation()
+        startSize = MainFrame.Size
+    end)
+    
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            resizing = false
+        end
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = game:GetService("UserInputService"):GetMouseLocation() - startPos
+            local newSize = UDim2.new(
+                startSize.X.Scale,
+                math.max(300, startSize.X.Offset + delta.X),
+                startSize.Y.Scale,
+                math.max(200, startSize.Y.Offset + delta.Y)
+            )
+            MainFrame.Size = newSize
+        end
+    end)
+    
     -- Create title bar
     local TitleBar = Instance.new("Frame")
     TitleBar.Name = "TitleBar"
@@ -143,7 +187,7 @@ function AnimationLogger:Init()
     UIListLayoutTop.Padding = UDim.new(0, 10)
     UIListLayoutTop.Parent = TopButtonsContainer
     
-    -- Show All toggle
+    -- Show All toggle (fixed positioning)
     local ShowAllContainer = Instance.new("Frame")
     ShowAllContainer.Name = "ShowAllContainer"
     ShowAllContainer.Size = UDim2.new(0, 100, 0, 30)
@@ -164,7 +208,7 @@ function AnimationLogger:Init()
     local ShowAllToggle = Instance.new("Frame")
     ShowAllToggle.Name = "ShowAllToggle"
     ShowAllToggle.Size = UDim2.new(0, 40, 0, 20)
-    ShowAllToggle.Position = UDim2.new(1, -40, 0.5, -10)
+    ShowAllToggle.Position = UDim2.new(0, 60, 0.5, -10) -- Fixed position
     ShowAllToggle.BackgroundColor3 = config.accentColor
     ShowAllToggle.Parent = ShowAllContainer
     
@@ -282,7 +326,7 @@ function AnimationLogger:Init()
         ScreenGui.Parent = player.PlayerGui
     end
     
-    -- Hook into animation events
+    -- Hook into animation events with the fixed method
     self:HookAnimations()
     
     return self
@@ -368,7 +412,7 @@ function AnimationLogger:FilterLogs(showAll)
     end
 end
 
--- Log local animations
+-- Log local animations with error handling
 function AnimationLogger:LogLocalAnimations()
     local player = players.LocalPlayer
     if not player or not player.Character then return end
@@ -379,9 +423,22 @@ function AnimationLogger:LogLocalAnimations()
     local animator = humanoid:FindFirstChildOfClass("Animator")
     if not animator then return end
     
-    local tracks = animator:GetPlayingAnimationTracks()
-    for _, track in pairs(tracks) do
-        self:LogAnimation(track.Animation)
+    -- Use pcall to safely get animation tracks
+    local success, tracks = pcall(function()
+        return animator:GetPlayingAnimationTracks()
+    end)
+    
+    if success and tracks then
+        for _, track in pairs(tracks) do
+            self:LogAnimation(track.Animation)
+        end
+    else
+        -- Alternative method if GetPlayingAnimationTracks fails
+        for _, instance in pairs(animator:GetChildren()) do
+            if instance:IsA("AnimationTrack") then
+                self:LogAnimation(instance.Animation)
+            end
+        end
     end
 end
 
@@ -566,7 +623,7 @@ function AnimationLogger:RetryAnimation(animId)
     animTrack:Play()
 end
 
--- Hook into animation events
+-- Hook into animation events with the fixed method
 function AnimationLogger:HookAnimations()
     local player = players.LocalPlayer
     if not player then return end
@@ -577,18 +634,24 @@ function AnimationLogger:HookAnimations()
         local humanoid = character:WaitForChild("Humanoid", 5)
         if not humanoid then return end
         
-        local animator = humanoid:WaitForChild("Animator", 5)
+        local animator = humanoid:FindFirstChildOfClass("Animator")
         if not animator then return end
         
-        -- Hook into GetPlayingAnimationTracks
-        local oldGetTracks = animator.GetPlayingAnimationTracks
-        animator.GetPlayingAnimationTracks = function(...)
-            local tracks = oldGetTracks(...)
-            for _, track in pairs(tracks) do
-                self:LogAnimation(track.Animation)
+        -- Use a safer approach to monitor animations
+        run_service.Heartbeat:Connect(function()
+            if not animator or not animator.Parent then return end
+            
+            -- Try to get animation tracks safely
+            local success, tracks = pcall(function()
+                return animator:GetPlayingAnimationTracks()
+            end)
+            
+            if success and tracks then
+                for _, track in pairs(tracks) do
+                    self:LogAnimation(track.Animation)
+                end
             end
-            return tracks
-        end
+        end)
         
         -- Monitor animation playing
         humanoid.AnimationPlayed:Connect(function(animTrack)
