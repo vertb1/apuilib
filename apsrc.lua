@@ -1,5 +1,10 @@
 local AnimationLogger = {}
 
+-- Services
+local players = game:GetService("Players")
+local http_service = game:GetService("HttpService")
+local run_service = game:GetService("RunService")
+
 -- UI Elements
 local ScreenGui = nil
 local MainFrame = nil
@@ -21,15 +26,61 @@ local config = {
     neutralColor = Color3.fromRGB(65, 105, 175),
     entryColor = Color3.fromRGB(40, 40, 55),
     maxLogs = 100,
-    fontSize = Enum.FontSize.Size14,
-    font = Enum.Font.GothamMedium,
+    fontSize = 14,
     cornerRadius = UDim.new(0, 6),
     padding = UDim.new(0, 8),
-    saveFileName = "AnimationBlacklist.json"
+    saveFileName = "AnimationBlacklist.json",
+    configFolder = "animation_logger"
 }
+
+-- Initialize the UI Library
+local function InitUILibrary()
+    -- Create directory structure
+    if not isfolder(config.configFolder) then
+        makefolder(config.configFolder)
+    end
+    
+    if not isfolder(config.configFolder .. "/fonts") then
+        makefolder(config.configFolder .. "/fonts")
+    end
+    
+    if not isfolder(config.configFolder .. "/configs") then
+        makefolder(config.configFolder .. "/configs")
+    end
+    
+    -- Download and save the font if it doesn't exist
+    if not isfile(config.configFolder .. "/fonts/main.ttf") then
+        writefile(config.configFolder .. "/fonts/main.ttf", game:HttpGet("https://github.com/f1nobe7650/other/raw/main/uis/font.ttf"))
+    end
+    
+    -- Create font encoding
+    local tahoma = {
+        name = "SmallestPixel7",
+        faces = {
+            {
+                name = "Regular",
+                weight = 400,
+                style = "normal",
+                assetId = getcustomasset(config.configFolder .. "/fonts/main.ttf")
+            }
+        }
+    }
+    
+    if not isfile(config.configFolder .. "/fonts/main_encoded.ttf") then
+        writefile(config.configFolder .. "/fonts/main_encoded.ttf", http_service:JSONEncode(tahoma))
+    end
+    
+    -- Load the font
+    AnimationLogger.font = Font.new(getcustomasset(config.configFolder .. "/fonts/main_encoded.ttf"), Enum.FontWeight.Regular)
+    
+    return AnimationLogger.font
+end
 
 -- Initialize the UI
 function AnimationLogger:Init()
+    -- Initialize UI Library and font
+    local font = InitUILibrary()
+    
     -- Create ScreenGui
     ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "AnimationLoggerGui"
@@ -73,7 +124,7 @@ function AnimationLogger:Init()
     Title.Text = "Animation Logger"
     Title.TextColor3 = config.textColor
     Title.TextSize = 18
-    Title.Font = config.font
+    Title.FontFace = font
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TitleBar
     
@@ -106,7 +157,7 @@ function AnimationLogger:Init()
     ShowAllLabel.Text = "Show All"
     ShowAllLabel.TextColor3 = config.textColor
     ShowAllLabel.TextSize = 14
-    ShowAllLabel.Font = config.font
+    ShowAllLabel.FontFace = font
     ShowAllLabel.TextXAlignment = Enum.TextXAlignment.Left
     ShowAllLabel.Parent = ShowAllContainer
     
@@ -145,20 +196,19 @@ function AnimationLogger:Init()
                 ToggleCircle.Position = UDim2.new(0, 2, 0.5, -8)
             end
             -- Implement filtering logic here
+            self:FilterLogs(showAllEnabled)
         end
     end)
     
-    -- Log Local button
+    -- Create top buttons
     self:CreateTopButton("Log Local", config.neutralColor, function()
-        -- Implement log local functionality
+        self:LogLocalAnimations()
     end, TopButtonsContainer)
     
-    -- Export button
     self:CreateTopButton("Export", config.neutralColor, function()
         self:ExportAnimations()
     end, TopButtonsContainer)
     
-    -- Clear button
     self:CreateTopButton("Clear", config.neutralColor, function()
         self:ClearLogs()
     end, TopButtonsContainer)
@@ -172,7 +222,7 @@ function AnimationLogger:Init()
     CloseButton.Text = "×"
     CloseButton.TextColor3 = config.textColor
     CloseButton.TextSize = 24
-    CloseButton.Font = config.font
+    CloseButton.FontFace = font
     CloseButton.Parent = TitleBar
     
     CloseButton.MouseButton1Click:Connect(function()
@@ -203,8 +253,31 @@ function AnimationLogger:Init()
     UIPadding.PaddingBottom = UDim.new(0, 5)
     UIPadding.Parent = LogContainer
     
+    -- Add accent line
+    local AccentLine = Instance.new("Frame")
+    AccentLine.Name = "AccentLine"
+    AccentLine.Size = UDim2.new(1, 0, 0, 2)
+    AccentLine.Position = UDim2.new(0, 0, 0, 0)
+    AccentLine.BackgroundColor3 = config.accentColor
+    AccentLine.BorderSizePixel = 0
+    AccentLine.Parent = MainFrame
+    
+    -- Add glow effect
+    local Glow = Instance.new("ImageLabel")
+    Glow.Name = "Glow"
+    Glow.Size = UDim2.new(1, 40, 0, 42)
+    Glow.Position = UDim2.new(0, -20, 0, -20)
+    Glow.BackgroundTransparency = 1
+    Glow.Image = "http://www.roblox.com/asset/?id=18245826428"
+    Glow.ImageColor3 = config.accentColor
+    Glow.ImageTransparency = 0.9
+    Glow.ScaleType = Enum.ScaleType.Slice
+    Glow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
+    Glow.ZIndex = 2
+    Glow.Parent = AccentLine
+    
     -- Add to PlayerGui
-    local player = game.Players.LocalPlayer
+    local player = players.LocalPlayer
     if player then
         ScreenGui.Parent = player.PlayerGui
     end
@@ -223,7 +296,7 @@ function AnimationLogger:CreateTopButton(text, color, callback, parent)
     Button.BackgroundColor3 = color
     Button.Text = text
     Button.TextColor3 = config.textColor
-    Button.Font = config.font
+    Button.FontFace = self.font
     Button.TextSize = 14
     Button.Parent = parent
     
@@ -258,7 +331,7 @@ function AnimationLogger:CreateEntryButton(text, color, parent, position, callba
     Button.BackgroundColor3 = color
     Button.Text = text
     Button.TextColor3 = config.textColor
-    Button.Font = config.font
+    Button.FontFace = self.font
     Button.TextSize = 12
     Button.Parent = parent
     
@@ -282,6 +355,34 @@ function AnimationLogger:CreateEntryButton(text, color, parent, position, callba
     Button.MouseButton1Click:Connect(callback)
     
     return Button
+end
+
+-- Filter logs based on Show All toggle
+function AnimationLogger:FilterLogs(showAll)
+    for _, child in pairs(LogContainer:GetChildren()) do
+        if child:IsA("Frame") then
+            -- Implement your filtering logic here
+            -- For example, you might want to hide certain animations when showAll is false
+            child.Visible = showAll
+        end
+    end
+end
+
+-- Log local animations
+function AnimationLogger:LogLocalAnimations()
+    local player = players.LocalPlayer
+    if not player or not player.Character then return end
+    
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if not animator then return end
+    
+    local tracks = animator:GetPlayingAnimationTracks()
+    for _, track in pairs(tracks) do
+        self:LogAnimation(track.Animation)
+    end
 end
 
 -- Log an animation
@@ -359,7 +460,7 @@ function AnimationLogger:LogAnimation(animation)
     CountLabel.BackgroundTransparency = 1
     CountLabel.Text = "Seen: 1×"
     CountLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    CountLabel.Font = config.font
+    CountLabel.FontFace = self.font
     CountLabel.TextSize = 12
     CountLabel.TextXAlignment = Enum.TextXAlignment.Left
     CountLabel.Parent = LogEntry
@@ -372,7 +473,7 @@ function AnimationLogger:LogAnimation(animation)
     AnimNameLabel.BackgroundTransparency = 1
     AnimNameLabel.Text = animName
     AnimNameLabel.TextColor3 = config.textColor
-    AnimNameLabel.Font = Enum.Font.GothamBold
+    AnimNameLabel.FontFace = self.font
     AnimNameLabel.TextSize = 16
     AnimNameLabel.TextXAlignment = Enum.TextXAlignment.Left
     AnimNameLabel.Parent = LogEntry
@@ -385,7 +486,7 @@ function AnimationLogger:LogAnimation(animation)
     AnimIdLabel.BackgroundTransparency = 1
     AnimIdLabel.Text = "ID: " .. animId
     AnimIdLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    AnimIdLabel.Font = config.font
+    AnimIdLabel.FontFace = self.font
     AnimIdLabel.TextSize = 12
     AnimIdLabel.TextXAlignment = Enum.TextXAlignment.Left
     AnimIdLabel.TextTruncate = Enum.TextTruncate.AtEnd
@@ -406,7 +507,7 @@ function AnimationLogger:LogAnimation(animation)
     
     -- Save Config button
     self:CreateEntryButton("Save Config", config.accentColor, ButtonsRow, UDim2.new(0, 90, 0, 0), function()
-        -- Implement save config functionality
+        self:SaveConfig(animId, animName)
     end)
     
     -- Blacklist button
@@ -417,7 +518,7 @@ function AnimationLogger:LogAnimation(animation)
     
     -- Retry button
     self:CreateEntryButton("Retry", config.neutralColor, LogEntry, UDim2.new(0.5, -40, 1, -30), function()
-        -- Implement retry functionality
+        self:RetryAnimation(animId)
     end)
     
     -- Limit the number of logs
@@ -431,9 +532,43 @@ function AnimationLogger:LogAnimation(animation)
     end
 end
 
+-- Save animation config
+function AnimationLogger:SaveConfig(animId, animName)
+    local configData = {
+        id = animId,
+        name = animName,
+        timestamp = os.time()
+    }
+    
+    local fileName = config.configFolder .. "/configs/" .. animName:gsub("[^%w]", "_") .. ".json"
+    
+    local success, err = pcall(function()
+        writefile(fileName, http_service:JSONEncode(configData))
+    end)
+    
+    if not success then
+        warn("Failed to save config: " .. tostring(err))
+    end
+end
+
+-- Retry playing an animation
+function AnimationLogger:RetryAnimation(animId)
+    local player = players.LocalPlayer
+    if not player or not player.Character then return end
+    
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    local animation = Instance.new("Animation")
+    animation.AnimationId = animId
+    
+    local animTrack = humanoid:LoadAnimation(animation)
+    animTrack:Play()
+end
+
 -- Hook into animation events
 function AnimationLogger:HookAnimations()
-    local player = game.Players.LocalPlayer
+    local player = players.LocalPlayer
     if not player then return end
     
     local function hookCharacter(character)
@@ -493,6 +628,7 @@ end
 function AnimationLogger:BlacklistAnimation(animId)
     if not self:IsBlacklisted(animId) then
         table.insert(BlacklistedAnimations, animId)
+        self:SaveBlacklist()
     end
 end
 
@@ -509,7 +645,7 @@ end
 -- Save blacklist to file
 function AnimationLogger:SaveBlacklist()
     local success, err = pcall(function()
-        writefile(config.saveFileName, game:GetService("HttpService"):JSONEncode(BlacklistedAnimations))
+        writefile(config.configFolder .. "/" .. config.saveFileName, http_service:JSONEncode(BlacklistedAnimations))
     end)
     
     if not success then
@@ -520,11 +656,11 @@ end
 -- Load blacklist from file
 function AnimationLogger:LoadBlacklist()
     local success, content = pcall(function()
-        return readfile(config.saveFileName)
+        return readfile(config.configFolder .. "/" .. config.saveFileName)
     end)
     
     if success then
-        local decoded = game:GetService("HttpService"):JSONDecode(content)
+        local decoded = http_service:JSONDecode(content)
         BlacklistedAnimations = decoded
     else
         warn("Failed to load blacklist")
