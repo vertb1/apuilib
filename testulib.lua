@@ -1,407 +1,630 @@
 --[[
-    UI Library
-    A simple, modular UI library for creating game interfaces
-    Inspired by the Matrix Cheats UI
+    Animation Logger UI Library
+    Created by vertb1
+    
+    A simple UI library for logging animation data with toggle for local logging
 ]]
 
-local UILib = {}
-UILib.__index = UILib
+local AnimationLogger = {}
+AnimationLogger.__index = AnimationLogger
+
+-- Services
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
 -- Constants
-local COLORS = {
-    BACKGROUND = {20, 20, 20, 230},
-    HEADER = {25, 25, 25, 255},
-    ACCENT = {41, 128, 185, 255},
-    TEXT = {255, 255, 255, 255},
-    DISABLED = {100, 100, 100, 255},
-    BUTTON = {35, 35, 35, 255},
-    BUTTON_HOVER = {45, 45, 45, 255},
-    CHECKBOX_BG = {35, 35, 35, 255},
-    SLIDER_BG = {35, 35, 35, 255},
-    SLIDER_FILL = {41, 128, 185, 255}
-}
+local LOCAL_PLAYER = Players.LocalPlayer
+local FONT = Enum.Font.SourceSansBold
+local TEXT_COLOR = Color3.fromRGB(255, 255, 255)
+local BACKGROUND_COLOR = Color3.fromRGB(30, 30, 40)
+local HEADER_COLOR = Color3.fromRGB(40, 40, 50)
+local BUTTON_COLOR = Color3.fromRGB(60, 60, 70)
+local BUTTON_HOVER_COLOR = Color3.fromRGB(70, 70, 80)
+local SUCCESS_COLOR = Color3.fromRGB(45, 180, 45)
+local HOVER_TWEEN_INFO = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- Utility functions
-local function drawRect(x, y, width, height, color)
-    -- Implementation depends on your rendering system
-    -- This is a placeholder
-end
-
-local function drawText(text, x, y, size, color)
-    -- Implementation depends on your rendering system
-    -- This is a placeholder
-end
-
--- Create a new UI window
-function UILib.new(title, x, y, width, height)
-    local self = setmetatable({}, UILib)
+function AnimationLogger.new()
+    local self = setmetatable({}, AnimationLogger)
     
-    self.title = title or "UI Window"
-    self.x = x or 100
-    self.y = y or 100
-    self.width = width or 600
-    self.height = height or 400
-    self.visible = true
-    self.dragging = false
-    self.dragOffsetX = 0
-    self.dragOffsetY = 0
+    self.Enabled = true
+    self.LogLocal = true
+    self.Logs = {}
+    self.MaxLogs = 50
+    self.UI = nil
     
-    self.tabs = {}
-    self.activeTab = nil
-    self.elements = {}
+    self:CreateUI()
     
     return self
 end
 
--- Add a tab to the UI
-function UILib:addTab(name)
-    local tab = {
-        name = name,
-        elements = {}
-    }
+function AnimationLogger:CreateUI()
+    -- Create ScreenGui
+    self.UI = Instance.new("ScreenGui")
+    self.UI.Name = "AnimationLogger"
+    self.UI.ResetOnSpawn = false
+    self.UI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    table.insert(self.tabs, tab)
-    
-    if #self.tabs == 1 then
-        self.activeTab = 1
-    end
-    
-    return #self.tabs
-end
-
--- Add a section to a tab
-function UILib:addSection(tabIndex, name, x, y, width, height)
-    if not self.tabs[tabIndex] then return nil end
-    
-    local section = {
-        type = "section",
-        name = name,
-        x = x,
-        y = y,
-        width = width,
-        height = height,
-        elements = {}
-    }
-    
-    table.insert(self.tabs[tabIndex].elements, section)
-    return #self.tabs[tabIndex].elements
-end
-
--- Add a checkbox element
-function UILib:addCheckbox(tabIndex, sectionIndex, name, default)
-    if not self.tabs[tabIndex] or not self.tabs[tabIndex].elements[sectionIndex] then return nil end
-    
-    local section = self.tabs[tabIndex].elements[sectionIndex]
-    
-    local checkbox = {
-        type = "checkbox",
-        name = name,
-        value = default or false,
-        callback = nil
-    }
-    
-    table.insert(section.elements, checkbox)
-    return checkbox
-end
-
--- Add a slider element
-function UILib:addSlider(tabIndex, sectionIndex, name, min, max, default, suffix)
-    if not self.tabs[tabIndex] or not self.tabs[tabIndex].elements[sectionIndex] then return nil end
-    
-    local section = self.tabs[tabIndex].elements[sectionIndex]
-    
-    local slider = {
-        type = "slider",
-        name = name,
-        min = min or 0,
-        max = max or 100,
-        value = default or min or 0,
-        suffix = suffix or "%",
-        callback = nil
-    }
-    
-    table.insert(section.elements, slider)
-    return slider
-end
-
--- Add a button element
-function UILib:addButton(tabIndex, sectionIndex, name, callback)
-    if not self.tabs[tabIndex] or not self.tabs[tabIndex].elements[sectionIndex] then return nil end
-    
-    local section = self.tabs[tabIndex].elements[sectionIndex]
-    
-    local button = {
-        type = "button",
-        name = name,
-        callback = callback
-    }
-    
-    table.insert(section.elements, button)
-    return button
-end
-
--- Add a dropdown element
-function UILib:addDropdown(tabIndex, sectionIndex, name, options, default)
-    if not self.tabs[tabIndex] or not self.tabs[tabIndex].elements[sectionIndex] then return nil end
-    
-    local section = self.tabs[tabIndex].elements[sectionIndex]
-    
-    local dropdown = {
-        type = "dropdown",
-        name = name,
-        options = options or {},
-        value = default or (options and options[1] or ""),
-        open = false,
-        callback = nil
-    }
-    
-    table.insert(section.elements, dropdown)
-    return dropdown
-end
-
--- Add a keybind element
-function UILib:addKeybind(tabIndex, sectionIndex, name, default, callback)
-    if not self.tabs[tabIndex] or not self.tabs[tabIndex].elements[sectionIndex] then return nil end
-    
-    local section = self.tabs[tabIndex].elements[sectionIndex]
-    
-    local keybind = {
-        type = "keybind",
-        name = name,
-        key = default or "",
-        listening = false,
-        callback = callback
-    }
-    
-    table.insert(section.elements, keybind)
-    return keybind
-end
-
--- Set callback for an element
-function UILib:setCallback(element, callback)
-    if element then
-        element.callback = callback
-    end
-end
-
--- Handle mouse input
-function UILib:handleMouse(mouseX, mouseY, mouseButton, isDown)
-    if not self.visible then return end
-    
-    -- Handle window dragging
-    if isDown and mouseButton == 1 then
-        if mouseX >= self.x and mouseX <= self.x + self.width and
-           mouseY >= self.y and mouseY <= self.y + 30 then
-            self.dragging = true
-            self.dragOffsetX = mouseX - self.x
-            self.dragOffsetY = mouseY - self.y
-        end
+    if RunService:IsStudio() then
+        self.UI.Parent = LOCAL_PLAYER:WaitForChild("PlayerGui")
     else
-        self.dragging = false
+        self.UI.Parent = game:GetService("CoreGui")
     end
     
-    if self.dragging then
-        self.x = mouseX - self.dragOffsetX
-        self.y = mouseY - self.dragOffsetY
-    end
+    -- Create Main Frame
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 400, 0, 300)
+    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+    mainFrame.BackgroundColor3 = BACKGROUND_COLOR
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    mainFrame.Parent = self.UI
     
-    -- Handle tab selection
-    local tabWidth = 100
-    local tabHeight = 30
-    local tabX = self.x
+    -- Rounded corners
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 8)
+    uiCorner.Parent = mainFrame
     
-    for i, tab in ipairs(self.tabs) do
-        if mouseX >= tabX and mouseX <= tabX + tabWidth and
-           mouseY >= self.y + 30 and mouseY <= self.y + 30 + tabHeight and
-           isDown and mouseButton == 1 then
-            self.activeTab = i
+    -- Header
+    local header = Instance.new("Frame")
+    header.Name = "Header"
+    header.Size = UDim2.new(1, 0, 0, 40)
+    header.BackgroundColor3 = HEADER_COLOR
+    header.BorderSizePixel = 0
+    header.Parent = mainFrame
+    
+    local headerCorner = Instance.new("UICorner")
+    headerCorner.CornerRadius = UDim.new(0, 8)
+    headerCorner.Parent = header
+    
+    -- Fix header corners
+    local headerFix = Instance.new("Frame")
+    headerFix.Name = "HeaderFix"
+    headerFix.Size = UDim2.new(1, 0, 0.5, 0)
+    headerFix.Position = UDim2.new(0, 0, 0.5, 0)
+    headerFix.BackgroundColor3 = HEADER_COLOR
+    headerFix.BorderSizePixel = 0
+    headerFix.ZIndex = 0
+    headerFix.Parent = header
+    
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(1, -100, 1, 0)
+    title.BackgroundTransparency = 1
+    title.Font = FONT
+    title.Text = "Animation Logger"
+    title.TextSize = 22
+    title.TextColor3 = TEXT_COLOR
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Position = UDim2.new(0, 15, 0, 0)
+    title.Parent = header
+    
+    -- Credits
+    local credits = Instance.new("TextLabel")
+    credits.Name = "Credits"
+    credits.Size = UDim2.new(0, 100, 0, 20)
+    credits.Position = UDim2.new(1, -110, 0.5, -10)
+    credits.BackgroundTransparency = 1
+    credits.Font = FONT
+    credits.Text = "by vertb1"
+    credits.TextSize = 14
+    credits.TextColor3 = Color3.fromRGB(200, 200, 200)
+    credits.TextXAlignment = Enum.TextXAlignment.Right
+    credits.Parent = header
+    
+    -- Close Button
+    local closeButton = Instance.new("TextButton")
+    closeButton.Name = "CloseButton"
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -35, 0, 5)
+    closeButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+    closeButton.Text = "X"
+    closeButton.TextSize = 18
+    closeButton.Font = FONT
+    closeButton.TextColor3 = TEXT_COLOR
+    closeButton.Parent = header
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 6)
+    closeCorner.Parent = closeButton
+    
+    -- Button hover effect
+    closeButton.MouseEnter:Connect(function()
+        TweenService:Create(closeButton, HOVER_TWEEN_INFO, {BackgroundColor3 = Color3.fromRGB(220, 70, 70)}):Play()
+    end)
+    
+    closeButton.MouseLeave:Connect(function()
+        TweenService:Create(closeButton, HOVER_TWEEN_INFO, {BackgroundColor3 = Color3.fromRGB(180, 60, 60)}):Play()
+    end)
+    
+    closeButton.MouseButton1Click:Connect(function()
+        self.UI.Enabled = false
+    end)
+    
+    -- Controls Frame
+    local controlsFrame = Instance.new("Frame")
+    controlsFrame.Name = "Controls"
+    controlsFrame.Size = UDim2.new(1, -20, 0, 40)
+    controlsFrame.Position = UDim2.new(0, 10, 0, 50)
+    controlsFrame.BackgroundTransparency = 1
+    controlsFrame.Parent = mainFrame
+    
+    -- Toggle Log Local
+    local logLocalLabel = Instance.new("TextLabel")
+    logLocalLabel.Name = "LogLocalLabel"
+    logLocalLabel.Size = UDim2.new(0, 80, 1, 0)
+    logLocalLabel.BackgroundTransparency = 1
+    logLocalLabel.Font = FONT
+    logLocalLabel.Text = "Log Local"
+    logLocalLabel.TextSize = 16
+    logLocalLabel.TextColor3 = TEXT_COLOR
+    logLocalLabel.TextXAlignment = Enum.TextXAlignment.Left
+    logLocalLabel.Parent = controlsFrame
+    
+    -- Toggle Button
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Name = "ToggleFrame"
+    toggleFrame.Size = UDim2.new(0, 50, 0, 26)
+    toggleFrame.Position = UDim2.new(0, 90, 0.5, -13)
+    toggleFrame.BackgroundColor3 = SUCCESS_COLOR
+    toggleFrame.Parent = controlsFrame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggleFrame
+    
+    local toggleButton = Instance.new("Frame")
+    toggleButton.Name = "ToggleButton"
+    toggleButton.Size = UDim2.new(0, 20, 0, 20)
+    toggleButton.Position = UDim2.new(1, -23, 0.5, -10)
+    toggleButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    toggleButton.Parent = toggleFrame
+    
+    local toggleButtonCorner = Instance.new("UICorner")
+    toggleButtonCorner.CornerRadius = UDim.new(1, 0)
+    toggleButtonCorner.Parent = toggleButton
+    
+    -- Toggle Functionality
+    toggleFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            self.LogLocal = not self.LogLocal
+            if self.LogLocal then
+                toggleButton.Position = UDim2.new(1, -23, 0.5, -10)
+                toggleFrame.BackgroundColor3 = SUCCESS_COLOR
+            else
+                toggleButton.Position = UDim2.new(0, 3, 0.5, -10)
+                toggleFrame.BackgroundColor3 = Color3.fromRGB(120, 120, 130)
+            end
         end
+    end)
+    
+    -- Clear Button
+    local clearButton = Instance.new("TextButton")
+    clearButton.Name = "ClearButton"
+    clearButton.Size = UDim2.new(0, 80, 0, 30)
+    clearButton.Position = UDim2.new(1, -85, 0.5, -15)
+    clearButton.BackgroundColor3 = BUTTON_COLOR
+    clearButton.Text = "Clear"
+    clearButton.TextSize = 16
+    clearButton.Font = FONT
+    clearButton.TextColor3 = TEXT_COLOR
+    clearButton.Parent = controlsFrame
+    
+    local clearCorner = Instance.new("UICorner")
+    clearCorner.CornerRadius = UDim.new(0, 6)
+    clearCorner.Parent = clearButton
+    
+    -- Button hover effect
+    clearButton.MouseEnter:Connect(function()
+        TweenService:Create(clearButton, HOVER_TWEEN_INFO, {BackgroundColor3 = BUTTON_HOVER_COLOR}):Play()
+    end)
+    
+    clearButton.MouseLeave:Connect(function()
+        TweenService:Create(clearButton, HOVER_TWEEN_INFO, {BackgroundColor3 = BUTTON_COLOR}):Play()
+    end)
+    
+    clearButton.MouseButton1Click:Connect(function()
+        self:ClearLogs()
+    end)
+    
+    -- Export Button
+    local exportButton = Instance.new("TextButton")
+    exportButton.Name = "ExportButton"
+    exportButton.Size = UDim2.new(0, 80, 0, 30)
+    exportButton.Position = UDim2.new(1, -170, 0.5, -15)
+    exportButton.BackgroundColor3 = BUTTON_COLOR
+    exportButton.Text = "Export"
+    exportButton.TextSize = 16
+    exportButton.Font = FONT
+    exportButton.TextColor3 = TEXT_COLOR
+    exportButton.Parent = controlsFrame
+    
+    local exportCorner = Instance.new("UICorner")
+    exportCorner.CornerRadius = UDim.new(0, 6)
+    exportCorner.Parent = exportButton
+    
+    -- Button hover effect
+    exportButton.MouseEnter:Connect(function()
+        TweenService:Create(exportButton, HOVER_TWEEN_INFO, {BackgroundColor3 = BUTTON_HOVER_COLOR}):Play()
+    end)
+    
+    exportButton.MouseLeave:Connect(function()
+        TweenService:Create(exportButton, HOVER_TWEEN_INFO, {BackgroundColor3 = BUTTON_COLOR}):Play()
+    end)
+    
+    exportButton.MouseButton1Click:Connect(function()
+        self:ExportLogs()
+    end)
+    
+    -- Logs Container
+    local logsContainer = Instance.new("ScrollingFrame")
+    logsContainer.Name = "LogsContainer"
+    logsContainer.Size = UDim2.new(1, -20, 1, -100)
+    logsContainer.Position = UDim2.new(0, 10, 0, 90)
+    logsContainer.BackgroundTransparency = 0.9
+    logsContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    logsContainer.BorderSizePixel = 0
+    logsContainer.ScrollBarThickness = 6
+    logsContainer.ScrollingDirection = Enum.ScrollingDirection.Y
+    logsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    logsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+    logsContainer.Parent = mainFrame
+    
+    local logsContainerCorner = Instance.new("UICorner")
+    logsContainerCorner.CornerRadius = UDim.new(0, 6)
+    logsContainerCorner.Parent = logsContainer
+    
+    -- Log Entry Template
+    local logEntryTemplate = Instance.new("Frame")
+    logEntryTemplate.Name = "LogEntryTemplate"
+    logEntryTemplate.Size = UDim2.new(1, -10, 0, 60)
+    logEntryTemplate.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    logEntryTemplate.BorderSizePixel = 0
+    logEntryTemplate.Visible = false
+    logEntryTemplate.Parent = self.UI
+    
+    local logEntryCorner = Instance.new("UICorner")
+    logEntryCorner.CornerRadius = UDim.new(0, 6)
+    logEntryCorner.Parent = logEntryTemplate
+    
+    -- Entry Layout
+    local entryLayout = Instance.new("UIListLayout")
+    entryLayout.Name = "EntryLayout"
+    entryLayout.Padding = UDim.new(0, 5)
+    entryLayout.FillDirection = Enum.FillDirection.Vertical
+    entryLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    entryLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    entryLayout.Parent = logsContainer
+    
+    -- Store references
+    self.LogsContainer = logsContainer
+    self.LogEntryTemplate = logEntryTemplate
+    
+    -- Logs Layout
+    self.LogsListLayout = entryLayout
+    
+    return self.UI
+end
+
+function AnimationLogger:AddLog(animName, animId, parryTiming)
+    if not self.Enabled then return end
+    
+    -- Create new log entry
+    local newLog = self.LogEntryTemplate:Clone()
+    newLog.Name = "LogEntry_" .. animName
+    newLog.Visible = true
+    newLog.LayoutOrder = #self.Logs + 1
+    newLog.Parent = self.LogsContainer
+    
+    -- Animation Name
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "AnimName"
+    nameLabel.Size = UDim2.new(1, -20, 0, 20)
+    nameLabel.Position = UDim2.new(0, 10, 0, 5)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Font = FONT
+    nameLabel.Text = animName
+    nameLabel.TextSize = 18
+    nameLabel.TextColor3 = TEXT_COLOR
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = newLog
+    
+    -- Animation ID
+    local idLabel = Instance.new("TextLabel")
+    idLabel.Name = "AnimID"
+    idLabel.Size = UDim2.new(1, -20, 0, 16)
+    idLabel.Position = UDim2.new(0, 10, 0, 25)
+    idLabel.BackgroundTransparency = 1
+    idLabel.Font = FONT
+    idLabel.Text = "ID: " .. animId
+    idLabel.TextSize = 14
+    idLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    idLabel.TextXAlignment = Enum.TextXAlignment.Left
+    idLabel.Parent = newLog
+    
+    -- Parry Timing
+    local parryLabel = Instance.new("TextLabel")
+    parryLabel.Name = "ParryTiming"
+    parryLabel.Size = UDim2.new(0, 100, 0, 16)
+    parryLabel.Position = UDim2.new(0, 10, 0, 41)
+    parryLabel.BackgroundTransparency = 1
+    parryLabel.Font = FONT
+    parryLabel.Text = parryTiming and parryTiming or "No parry timing"
+    parryLabel.TextSize = 14
+    parryLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    parryLabel.TextXAlignment = Enum.TextXAlignment.Left
+    parryLabel.Parent = newLog
+    
+    -- Seen Count
+    local seenLabel = Instance.new("TextLabel")
+    seenLabel.Name = "SeenCount"
+    seenLabel.Size = UDim2.new(0, 60, 0, 16)
+    seenLabel.Position = UDim2.new(1, -65, 0, 41)
+    seenLabel.BackgroundTransparency = 1
+    seenLabel.Font = FONT
+    seenLabel.Text = "Seen: 1×"
+    seenLabel.TextSize = 14
+    seenLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    seenLabel.TextXAlignment = Enum.TextXAlignment.Right
+    seenLabel.Parent = newLog
+    
+    -- Copy ID Button
+    local copyButton = Instance.new("TextButton")
+    copyButton.Name = "CopyID"
+    copyButton.Size = UDim2.new(0, 60, 0, 20)
+    copyButton.Position = UDim2.new(1, -130, 0, 10)
+    copyButton.BackgroundColor3 = BUTTON_COLOR
+    copyButton.Text = "Copy ID"
+    copyButton.TextSize = 12
+    copyButton.Font = FONT
+    copyButton.TextColor3 = TEXT_COLOR
+    copyButton.Parent = newLog
+    
+    local copyCorner = Instance.new("UICorner")
+    copyCorner.CornerRadius = UDim.new(0, 4)
+    copyCorner.Parent = copyButton
+    
+    -- Button hover effect
+    copyButton.MouseEnter:Connect(function()
+        TweenService:Create(copyButton, HOVER_TWEEN_INFO, {BackgroundColor3 = BUTTON_HOVER_COLOR}):Play()
+    end)
+    
+    copyButton.MouseLeave:Connect(function()
+        TweenService:Create(copyButton, HOVER_TWEEN_INFO, {BackgroundColor3 = BUTTON_COLOR}):Play()
+    end)
+    
+    copyButton.MouseButton1Click:Connect(function()
+        setclipboard(animId)
+        copyButton.Text = "Copied!"
+        task.delay(1, function()
+            copyButton.Text = "Copy ID"
+        end)
+    end)
+    
+    -- Save Config Button
+    local saveButton = Instance.new("TextButton")
+    saveButton.Name = "SaveConfig"
+    saveButton.Size = UDim2.new(0, 80, 0, 20)
+    saveButton.Position = UDim2.new(1, -65, 0, 10)
+    saveButton.BackgroundColor3 = BUTTON_COLOR
+    saveButton.Text = "Save Config"
+    saveButton.TextSize = 12
+    saveButton.Font = FONT
+    saveButton.TextColor3 = TEXT_COLOR
+    saveButton.Parent = newLog
+    
+    local saveCorner = Instance.new("UICorner")
+    saveCorner.CornerRadius = UDim.new(0, 4)
+    saveCorner.Parent = saveButton
+    
+    -- Button hover effect
+    saveButton.MouseEnter:Connect(function()
+        TweenService:Create(saveButton, HOVER_TWEEN_INFO, {BackgroundColor3 = BUTTON_HOVER_COLOR}):Play()
+    end)
+    
+    saveButton.MouseLeave:Connect(function()
+        TweenService:Create(saveButton, HOVER_TWEEN_INFO, {BackgroundColor3 = BUTTON_COLOR}):Play()
+    end)
+    
+    -- Retry Button
+    local retryButton = Instance.new("TextButton")
+    retryButton.Name = "Retry"
+    retryButton.Size = UDim2.new(0, 60, 0, 20)
+    retryButton.Position = UDim2.new(0.5, -30, 1, -25)
+    retryButton.BackgroundColor3 = Color3.fromRGB(50, 100, 170)
+    retryButton.Text = "Retry"
+    retryButton.TextSize = 14
+    retryButton.Font = FONT
+    retryButton.TextColor3 = TEXT_COLOR
+    retryButton.Parent = newLog
+    
+    local retryCorner = Instance.new("UICorner")
+    retryCorner.CornerRadius = UDim.new(0, 4)
+    retryCorner.Parent = retryButton
+    
+    -- Blacklist Button
+    local blacklistButton = Instance.new("TextButton")
+    blacklistButton.Name = "Blacklist"
+    blacklistButton.Size = UDim2.new(0, 70, 0, 20)
+    blacklistButton.Position = UDim2.new(1, -75, 1, -25)
+    blacklistButton.BackgroundColor3 = Color3.fromRGB(150, 60, 60)
+    blacklistButton.Text = "Blacklist"
+    blacklistButton.TextSize = 14
+    blacklistButton.Font = FONT
+    blacklistButton.TextColor3 = TEXT_COLOR
+    blacklistButton.Parent = newLog
+    
+    local blacklistCorner = Instance.new("UICorner")
+    blacklistCorner.CornerRadius = UDim.new(0, 4)
+    blacklistCorner.Parent = blacklistButton
+    
+    -- Button hover effects
+    retryButton.MouseEnter:Connect(function()
+        TweenService:Create(retryButton, HOVER_TWEEN_INFO, {BackgroundColor3 = Color3.fromRGB(60, 120, 200)}):Play()
+    end)
+    
+    retryButton.MouseLeave:Connect(function()
+        TweenService:Create(retryButton, HOVER_TWEEN_INFO, {BackgroundColor3 = Color3.fromRGB(50, 100, 170)}):Play()
+    end)
+    
+    blacklistButton.MouseEnter:Connect(function()
+        TweenService:Create(blacklistButton, HOVER_TWEEN_INFO, {BackgroundColor3 = Color3.fromRGB(180, 70, 70)}):Play()
+    end)
+    
+    blacklistButton.MouseLeave:Connect(function()
+        TweenService:Create(blacklistButton, HOVER_TWEEN_INFO, {BackgroundColor3 = Color3.fromRGB(150, 60, 60)}):Play()
+    end)
+    
+    -- Store log data
+    local logData = {
+        Name = animName,
+        ID = animId,
+        ParryTiming = parryTiming,
+        Element = newLog,
+        SeenCount = 1
+    }
+    
+    table.insert(self.Logs, logData)
+    
+    -- Limit logs count
+    if #self.Logs > self.MaxLogs then
+        local oldestLog = table.remove(self.Logs, 1)
+        if oldestLog.Element and oldestLog.Element.Parent then
+            oldestLog.Element:Destroy()
+        end
+    end
+    
+    return logData
+end
+
+function AnimationLogger:LogAnimation(character, animationTrack)
+    if not self.Enabled or (not self.LogLocal and character == LOCAL_PLAYER.Character) then
+        return
+    end
+    
+    local animName = animationTrack.Name
+    local animId = animationTrack.Animation.AnimationId
+    
+    -- Check if this animation already exists
+    for _, log in ipairs(self.Logs) do
+        if log.ID == animId then
+            log.SeenCount = log.SeenCount + 1
+            if log.Element then
+                local seenLabel = log.Element:FindFirstChild("SeenCount")
+                if seenLabel then
+                    seenLabel.Text = "Seen: " .. log.SeenCount .. "×"
+                end
+            end
+            return log
+        end
+    end
+    
+    -- Add new log
+    return self:AddLog(animName, animId)
+end
+
+function AnimationLogger:ClearLogs()
+    for _, log in ipairs(self.Logs) do
+        if log.Element and log.Element.Parent then
+            log.Element:Destroy()
+        end
+    end
+    
+    self.Logs = {}
+end
+
+function AnimationLogger:ExportLogs()
+    local exportString = "Animation Logs Export:\n\n"
+    
+    for i, log in ipairs(self.Logs) do
+        exportString = exportString .. i .. ". " .. log.Name .. "\n"
+        exportString = exportString .. "   ID: " .. log.ID .. "\n"
+        if log.ParryTiming then
+            exportString = exportString .. "   Parry Timing: " .. log.ParryTiming .. "\n"
+        else
+            exportString = exportString .. "   Parry Timing: None\n"
+        end
+        exportString = exportString .. "   Seen Count: " .. log.SeenCount .. "\n\n"
+    end
+    
+    setclipboard(exportString)
+    
+    -- Create notification
+    local notification = Instance.new("Frame")
+    notification.Name = "Notification"
+    notification.Size = UDim2.new(0, 200, 0, 50)
+    notification.Position = UDim2.new(0.5, -100, 0, -60)
+    notification.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    notification.BorderSizePixel = 0
+    notification.Parent = self.UI
+    
+    local notifCorner = Instance.new("UICorner")
+    notifCorner.CornerRadius = UDim.new(0, 8)
+    notifCorner.Parent = notification
+    
+    local notifText = Instance.new("TextLabel")
+    notifText.Name = "NotifText"
+    notifText.Size = UDim2.new(1, 0, 1, 0)
+    notifText.BackgroundTransparency = 1
+    notifText.Font = FONT
+    notifText.Text = "Logs exported to clipboard!"
+    notifText.TextSize = 16
+    notifText.TextColor3 = TEXT_COLOR
+    notifText.Parent = notification
+    
+    -- Animate notification
+    notification:TweenPosition(UDim2.new(0.5, -100, 0, 20), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.5, true)
+    
+    task.delay(3, function()
+        notification:TweenPosition(UDim2.new(0.5, -100, 0, -60), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.5, true, function()
+            notification:Destroy()
+        end)
+    end)
+end
+
+function AnimationLogger:SetVisible(visible)
+    if self.UI then
+        self.UI.Enabled = visible
+    end
+end
+
+function AnimationLogger:ToggleVisibility()
+    if self.UI then
+        self.UI.Enabled = not self.UI.Enabled
+    end
+end
+
+-- Listen for animations
+function AnimationLogger:StartTracking()
+    local function trackCharacter(character)
+        local humanoid = character:WaitForChild("Humanoid")
         
-        tabX = tabX + tabWidth
+        humanoid.AnimationPlayed:Connect(function(animTrack)
+            self:LogAnimation(character, animTrack)
+        end)
     end
     
-    -- Handle elements
-    if self.activeTab and self.tabs[self.activeTab] then
-        for _, section in ipairs(self.tabs[self.activeTab].elements) do
-            if section.type == "section" then
-                local sectionX = self.x + section.x
-                local sectionY = self.y + section.y
-                
-                for i, element in ipairs(section.elements) do
-                    local elementY = sectionY + 30 + (i - 1) * 30
-                    
-                    if element.type == "checkbox" then
-                        local checkboxX = sectionX + section.width - 30
-                        
-                        if mouseX >= checkboxX and mouseX <= checkboxX + 20 and
-                           mouseY >= elementY and mouseY <= elementY + 20 and
-                           isDown and mouseButton == 1 then
-                            element.value = not element.value
-                            if element.callback then
-                                element.callback(element.value)
-                            end
-                        end
-                    elseif element.type == "slider" then
-                        local sliderX = sectionX + 100
-                        local sliderWidth = section.width - 120
-                        
-                        if mouseX >= sliderX and mouseX <= sliderX + sliderWidth and
-                           mouseY >= elementY and mouseY <= elementY + 20 and
-                           isDown and mouseButton == 1 then
-                            local percentage = (mouseX - sliderX) / sliderWidth
-                            element.value = element.min + (element.max - element.min) * percentage
-                            if element.callback then
-                                element.callback(element.value)
-                            end
-                        end
-                    elseif element.type == "button" then
-                        if mouseX >= sectionX + 10 and mouseX <= sectionX + section.width - 10 and
-                           mouseY >= elementY and mouseY <= elementY + 25 and
-                           isDown and mouseButton == 1 then
-                            if element.callback then
-                                element.callback()
-                            end
-                        end
-                    elseif element.type == "keybind" then
-                        local keybindX = sectionX + section.width - 50
-                        
-                        if mouseX >= keybindX and mouseX <= keybindX + 40 and
-                           mouseY >= elementY and mouseY <= elementY + 20 and
-                           isDown and mouseButton == 1 then
-                            element.listening = true
-                        end
-                    end
-                end
-            end
+    -- Track current player character
+    if LOCAL_PLAYER.Character then
+        trackCharacter(LOCAL_PLAYER.Character)
+    end
+    
+    -- Track future player characters
+    LOCAL_PLAYER.CharacterAdded:Connect(trackCharacter)
+    
+    -- Track other characters
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LOCAL_PLAYER and player.Character then
+            trackCharacter(player.Character)
         end
     end
+    
+    Players.PlayerAdded:Connect(function(player)
+        player.CharacterAdded:Connect(trackCharacter)
+    end)
 end
 
--- Handle keyboard input
-function UILib:handleKeyboard(key, isDown)
-    if not self.visible then return end
-    
-    if self.activeTab and self.tabs[self.activeTab] then
-        for _, section in ipairs(self.tabs[self.activeTab].elements) do
-            if section.type == "section" then
-                for _, element in ipairs(section.elements) do
-                    if element.type == "keybind" and element.listening and isDown then
-                        element.key = key
-                        element.listening = false
-                        if element.callback then
-                            element.callback(key)
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
--- Draw the UI
-function UILib:draw()
-    if not self.visible then return end
-    
-    -- Draw window background
-    drawRect(self.x, self.y, self.width, self.height, COLORS.BACKGROUND)
-    
-    -- Draw header
-    drawRect(self.x, self.y, self.width, 30, COLORS.HEADER)
-    drawText(self.title, self.x + 10, self.y + 8, 14, COLORS.TEXT)
-    
-    -- Draw tabs
-    local tabWidth = 100
-    local tabHeight = 30
-    local tabX = self.x
-    
-    for i, tab in ipairs(self.tabs) do
-        local tabColor = (self.activeTab == i) and COLORS.ACCENT or COLORS.BUTTON
-        drawRect(tabX, self.y + 30, tabWidth, tabHeight, tabColor)
-        drawText(tab.name, tabX + 10, self.y + 30 + 8, 12, COLORS.TEXT)
-        tabX = tabX + tabWidth
-    end
-    
-    -- Draw active tab content
-    if self.activeTab and self.tabs[self.activeTab] then
-        for _, section in ipairs(self.tabs[self.activeTab].elements) do
-            if section.type == "section" then
-                local sectionX = self.x + section.x
-                local sectionY = self.y + section.y
-                
-                -- Draw section background
-                drawRect(sectionX, sectionY, section.width, section.height, COLORS.BACKGROUND)
-                
-                -- Draw section header
-                drawRect(sectionX, sectionY, section.width, 30, COLORS.HEADER)
-                drawText(section.name, sectionX + 10, sectionY + 8, 12, COLORS.TEXT)
-                
-                -- Draw section elements
-                for i, element in ipairs(section.elements) do
-                    local elementY = sectionY + 30 + (i - 1) * 30
-                    
-                    if element.type == "checkbox" then
-                        drawText(element.name, sectionX + 10, elementY + 5, 12, COLORS.TEXT)
-                        
-                        local checkboxX = sectionX + section.width - 30
-                        drawRect(checkboxX, elementY, 20, 20, COLORS.CHECKBOX_BG)
-                        
-                        if element.value then
-                            drawRect(checkboxX + 4, elementY + 4, 12, 12, COLORS.ACCENT)
-                        end
-                    elseif element.type == "slider" then
-                        drawText(element.name, sectionX + 10, elementY - 15, 12, COLORS.TEXT)
-                        
-                        local sliderX = sectionX + 10
-                        local sliderWidth = section.width - 20
-                        
-                        -- Draw slider background
-                        drawRect(sliderX, elementY, sliderWidth, 10, COLORS.SLIDER_BG)
-                        
-                        -- Draw slider fill
-                        local fillWidth = (element.value - element.min) / (element.max - element.min) * sliderWidth
-                        drawRect(sliderX, elementY, fillWidth, 10, COLORS.SLIDER_FILL)
-                        
-                        -- Draw value text
-                        local valueText = tostring(math.floor(element.value)) .. element.suffix
-                        drawText(valueText, sliderX + sliderWidth - 40, elementY + 15, 12, COLORS.TEXT)
-                    elseif element.type == "button" then
-                        drawRect(sectionX + 10, elementY, section.width - 20, 25, COLORS.BUTTON)
-                        drawText(element.name, sectionX + 20, elementY + 5, 12, COLORS.TEXT)
-                    elseif element.type == "dropdown" then
-                        drawText(element.name, sectionX + 10, elementY + 5, 12, COLORS.TEXT)
-                        
-                        local dropdownX = sectionX + section.width - 150
-                        drawRect(dropdownX, elementY, 140, 20, COLORS.BUTTON)
-                        drawText(element.value, dropdownX + 5, elementY + 3, 12, COLORS.TEXT)
-                        
-                        if element.open then
-                            for j, option in ipairs(element.options) do
-                                drawRect(dropdownX, elementY + 20 + (j-1) * 20, 140, 20, COLORS.BUTTON)
-                                drawText(option, dropdownX + 5, elementY + 23 + (j-1) * 20, 12, COLORS.TEXT)
-                            end
-                        end
-                    elseif element.type == "keybind" then
-                        drawText(element.name, sectionX + 10, elementY + 5, 12, COLORS.TEXT)
-                        
-                        local keybindX = sectionX + section.width - 50
-                        local keybindColor = element.listening and COLORS.ACCENT or COLORS.BUTTON
-                        drawRect(keybindX, elementY, 40, 20, keybindColor)
-                        drawText(element.key, keybindX + 15, elementY + 3, 12, COLORS.TEXT)
-                    end
-                end
-            end
-        end
-    end
-end
-
--- Toggle UI visibility
-function UILib:toggle()
-    self.visible = not self.visible
-end
-
--- Set UI visibility
-function UILib:setVisible(visible)
-    self.visible = visible
-end
-
-return UILib 
+return AnimationLogger 
