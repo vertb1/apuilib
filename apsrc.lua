@@ -2,16 +2,16 @@
 local AnimLogger = {}
 AnimLogger.__index = AnimLogger
 
--- Define a helper function for table deep copy
-function table.copy(orig)
+-- Define a local copy function instead of modifying global table
+local function copyTable(orig)
     local orig_type = type(orig)
     local copy
     if orig_type == 'table' then
         copy = {}
         for orig_key, orig_value in next, orig, nil do
-            copy[table.copy(orig_key)] = table.copy(orig_value)
+            copy[copyTable(orig_key)] = copyTable(orig_value)
         end
-        setmetatable(copy, table.copy(getmetatable(orig)))
+        setmetatable(copy, copyTable(getmetatable(orig)))
     else
         copy = orig
     end
@@ -32,7 +32,7 @@ local default_config = {
 }
 
 -- Local variables
-local config = table.copy(default_config)
+local config = copyTable(default_config)
 local frameCounter = 0
 local animationHistory = {}
 local initialized = false
@@ -315,7 +315,7 @@ end
 
 -- Reset to default configuration
 function AnimLogger.resetConfig()
-    config = table.copy(default_config)
+    config = copyTable(default_config)
     AnimLogger.saveConfig()
     return config
 end
