@@ -337,7 +337,91 @@ function AnimLogger.renderUI()
     if not initialized then AnimLogger.init() end
     if not config.displayUI then return end
     
-    -- This is just a placeholder - actual implementation depends on your UI framework
+    -- This implementation will need to be adapted to your specific UI framework
+    -- Below is a framework-agnostic description of what should be rendered:
+    
+    -- ===== HEADER SECTION =====
+    -- Title: "Animation Logger" on the left
+    -- Buttons: "Show All" | Toggle: "Log Local" (with switch) | "Export" | "Clear" | "X" (close)
+    
+    -- ===== ANIMATION ENTRIES =====
+    -- For each animation in history (limited to 10 or so for display):
+    --   Left column: "No parry timing" and "Seen: 1×" (or actual count)
+    --   Middle column: Animation name and "ID: [animation-id]"
+    --   Right column: Buttons "Copy ID" | "Save Config" | "Blacklist" | "Retry"
+    --   Separator line between entries
+    
+    -- Example implementation for specific UI frameworks:
+    
+    if game and game:GetService("CoreGui") then
+        -- Roblox implementation would go here
+        -- Using ScreenGui, Frame, TextLabel, TextButton components
+    elseif love then
+        -- LÖVE2D implementation would go here
+        -- Using love.graphics drawing functions
+    elseif ImGui then 
+        -- ImGui implementation
+        if ImGui.Begin("Animation Logger", true) then
+            -- Header
+            if ImGui.Button("Show All") then end
+            ImGui.SameLine()
+            local logLocal = config.logLocal or false
+            config.logLocal = ImGui.Toggle("Log Local", logLocal)
+            ImGui.SameLine()
+            if ImGui.Button("Export") then end
+            ImGui.SameLine()
+            if ImGui.Button("Clear") then AnimLogger.clearHistory() end
+            ImGui.SameLine()
+            if ImGui.Button("X") then config.displayUI = false end
+            
+            -- Display animations
+            for i, entry in ipairs(animationHistory) do
+                if i <= 10 then -- Limit displayed entries
+                    ImGui.PushID(i)
+                    
+                    -- Left column
+                    ImGui.Text("No parry timing")
+                    ImGui.Text("Seen: 1×")
+                    
+                    ImGui.SameLine(150)
+                    -- Middle column
+                    ImGui.Text(entry.name or "Unknown Animation")
+                    ImGui.Text("ID: " .. (entry.data.id or "Unknown"))
+                    
+                    ImGui.SameLine(350)
+                    -- Right column - buttons
+                    if ImGui.Button("Copy ID") then
+                        -- Copy ID to clipboard logic
+                    end
+                    ImGui.SameLine()
+                    if ImGui.Button("Save Config") then
+                        AnimLogger.saveConfig()
+                    end
+                    ImGui.SameLine()
+                    if ImGui.Button("Blacklist") then
+                        AnimLogger.addToBlacklist(entry.name)
+                    end
+                    ImGui.SameLine()
+                    if ImGui.Button("Retry") then
+                        -- Retry logic here
+                    end
+                    
+                    ImGui.Separator()
+                    ImGui.PopID()
+                end
+            end
+            ImGui.End()
+        end
+    else
+        -- Generic text-based fallback for console environments
+        print("=== Animation Logger ===")
+        print("Animations logged: " .. #animationHistory)
+        for i, entry in ipairs(animationHistory) do
+            if i <= 5 then -- Show only first 5 in console
+                print(entry.name .. " (ID: " .. (entry.data.id or "Unknown") .. ")")
+            end
+        end
+    end
 end
 
 -- Update function (call this every frame)
