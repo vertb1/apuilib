@@ -2,6 +2,22 @@
 local AnimLogger = {}
 AnimLogger.__index = AnimLogger
 
+-- Define a helper function for table deep copy
+function table.copy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[table.copy(orig_key)] = table.copy(orig_value)
+        end
+        setmetatable(copy, table.copy(getmetatable(orig)))
+    else
+        copy = orig
+    end
+    return copy
+end
+
 -- Default configuration
 local default_config = {
     enabled = true,
@@ -302,22 +318,6 @@ function AnimLogger.resetConfig()
     config = table.copy(default_config)
     AnimLogger.saveConfig()
     return config
-end
-
--- Define a helper function for table deep copy
-function table.copy(orig)
-    local orig_type = type(orig)
-    local copy
-    if orig_type == 'table' then
-        copy = {}
-        for orig_key, orig_value in next, orig, nil do
-            copy[table.copy(orig_key)] = table.copy(orig_value)
-        end
-        setmetatable(copy, table.copy(getmetatable(orig)))
-    else
-        copy = orig
-    end
-    return copy
 end
 
 return AnimLogger
