@@ -2,7 +2,7 @@
 local AnimLogger = {}
 AnimLogger.__index = AnimLogger
 
--- Define a local copy function instead of modifying global table
+-- Define a local copy function
 local function copyTable(orig)
     local orig_type = type(orig)
     local copy
@@ -37,120 +37,190 @@ local frameCounter = 0
 local animationHistory = {}
 local initialized = false
 
--- Ensure the log directory exists
-local function ensureLogDirectory()
-    local success, err = pcall(function()
-        local testFile = io.open(config.logFolder .. "/test.tmp", "w")
-        if testFile then
-            testFile:close()
-            os.remove(config.logFolder .. "/test.tmp")
-            return true
-        end
-        return false
-    end)
-    
-    if not success then
-        -- Attempt to create directory
-        os.execute("mkdir " .. config.logFolder)
-        -- Check if creation was successful
-        local testFile = io.open(config.logFolder .. "/test.tmp", "w")
-        if testFile then
-            testFile:close()
-            os.remove(config.logFolder .. "/test.tmp")
-            return true
-        end
+-- Safe I/O operations with fallbacks
+local function safeFileExists(path)
+    -- Check if io module is available
+    if not io then
         return false
     end
     
-    return true
+    -- Try to open the file
+    local file = io.open(path, "r")
+    if file then
+        file:close()
+        return true
+    end
+    return false
 end
 
--- Save configuration to file
+local function safeWriteFile(path, content)
+    -- Check if io module is available
+    if not io then
+        return false
+    end
+    
+    -- Try to write to the file
+    local file = io.open(path, "w")
+    if file then
+        file:write(content)
+        file:close()
+        return true
+    end
+    return false
+end
+
+local function safeReadFile(path)
+    -- Check if io module is available
+    if not io then
+        return nil
+    end
+    
+    -- Try to read the file
+    local file = io.open(path, "r")
+    if file then
+        local content = file:read("*all")
+        file:close()
+        return content
+    end
+    return nil
+end
+
+-- Simplified directory handling that works in restricted environments
+local function ensureLogDirectory()
+    -- If we're in a restricted environment, just assume the directory exists
+    if not io or not os then
+        return true
+    end
+    
+    -- Try to create a test file in the directory
+    local success = pcall(function()
+        local testFile = io.open(config.logFolder .. "/test.tmp", "w")
+        if testFile then
+            testFile:close()
+            os.remove(config.logFolder .. "/test.tmp")
+        end
+    end)
+    
+    -- If that failed, try to create the directory
+    if not success and os and os.execute then
+        -- Different commands for different OS types
+        local createDirCmd
+        if package and package.config and package.config:sub(1,1) == '\\' then
+            -- Windows
+            createDirCmd = "mkdir \"" .. config.logFolder .. "\""
+        else
+            -- Unix-like
+            createDirCmd = "mkdir -p \"" .. config.logFolder .. "\""
+        end
+        
+        os.execute(createDirCmd)
+        
+        -- Verify the directory was created
+        success = pcall(function() 
+            local testFile = io.open(config.logFolder .. "/test.tmp", "w")
+            if testFile then
+                testFile:close()
+                os.remove(config.logFolder .. "/test.tmp")
+            end
+        end)
+    end
+    
+    return success
+end
+
+-- Save configuration to file (with fallbacks)
 function AnimLogger.saveConfig()
+    -- Skip file operations in restricted environments
+    if not io then
+        return false
+    end
+    
     if not ensureLogDirectory() then
         print("AnimLogger: Failed to create log directory")
         return false
     end
     
-    local configFile = io.open(config.logFolder .. "/config.json", "w")
-    if configFile then
-        local success, result = pcall(function()
-            local json = require("json") -- Assuming JSON module is available
-            return json.encode(config)
-        end)
-        
-        if success then
-            configFile:write(result)
-            configFile:close()
-            return true
-        else
-            -- Fallback to simple serialization if JSON module is not available
-            local serialized = "return {\n"
-            for k, v in pairs(config) do
-                if type(v) == "string" then
-                    serialized = serialized .. "  " .. k .. " = \"" .. v .. "\",\n"
-                elseif type(v) == "table" then
-                    if k == "blacklist" then
-                        serialized = serialized .. "  " .. k .. " = {\n"
-                        for _, item in ipairs(v) do
-                            serialized = serialized .. "    \"" .. item .. "\",\n"
-                        end
-                        serialized = serialized .. "  },\n"
-                    else
-                        serialized = serialized .. "  " .. k .. " = { "
-                        for tk, tv in pairs(v) do
-                            serialized = serialized .. tk .. " = " .. tv .. ", "
-                        end
-                        serialized = serialized .. "},\n"
+    local serialized
+    
+    -- Try JSON encoding first
+    if pcall(function() require("json") end) then
+        local json = require("json")
+        serialized = json.encode(config)
+    else
+        -- Fallback to simple serialization
+        serialized = "return {\n"
+        for k, v in pairs(config) do
+            if type(v) == "string" then
+                serialized = serialized .. "  " .. k .. " = \"" .. v .. "\",\n"
+            elseif type(v) == "table" then
+                if k == "blacklist" then
+                    serialized = serialized .. "  " .. k .. " = {\n"
+                    for _, item in ipairs(v) do
+                        serialized = serialized .. "    \"" .. item .. "\",\n"
                     end
+                    serialized = serialized .. "  },\n"
                 else
-                    serialized = serialized .. "  " .. k .. " = " .. tostring(v) .. ",\n"
+                    serialized = serialized .. "  " .. k .. " = { "
+                    for tk, tv in pairs(v) do
+                        serialized = serialized .. tk .. " = " .. tv .. ", "
+                    end
+                    serialized = serialized .. "},\n"
                 end
+            else
+                serialized = serialized .. "  " .. k .. " = " .. tostring(v) .. ",\n"
             end
-            serialized = serialized .. "}"
-            
-            configFile:write(serialized)
-            configFile:close()
-            return true
         end
+        serialized = serialized .. "}"
     end
     
-    return false
+    return safeWriteFile(config.logFolder .. "/config.json", serialized)
 end
 
--- Load configuration from file
+-- Load configuration from file (with fallbacks)
 function AnimLogger.loadConfig()
-    local configFile = io.open(config.logFolder .. "/config.json", "r")
-    if configFile then
-        local content = configFile:read("*all")
-        configFile:close()
-        
-        local success, result = pcall(function()
-            local json = require("json") -- Assuming JSON module is available
-            return json.decode(content)
-        end)
-        
-        if success then
+    -- Skip file operations in restricted environments
+    if not io then
+        return false
+    end
+    
+    local content = safeReadFile(config.logFolder .. "/config.json")
+    if not content then
+        AnimLogger.saveConfig()
+        return false
+    end
+    
+    local success = false
+    
+    -- Try JSON decoding first
+    if pcall(function() require("json") end) then
+        local json = require("json")
+        local result = json.decode(content)
+        if result then
             for k, v in pairs(result) do
                 config[k] = v
             end
-            return true
-        else
-            -- Fallback to lua loader if JSON not available
-            local func, err = loadstring(content)
-            if func then
-                local loaded_config = func()
-                for k, v in pairs(loaded_config) do
-                    config[k] = v
-                end
-                return true
+            success = true
+        end
+    end
+    
+    -- Fallback to Lua loader if JSON failed
+    if not success and loadstring then
+        local func = loadstring(content)
+        if func then
+            local loaded_config = func()
+            for k, v in pairs(loaded_config) do
+                config[k] = v
             end
+            success = true
         end
     end
     
     -- If loading fails, save the default config
-    AnimLogger.saveConfig()
-    return false
+    if not success then
+        AnimLogger.saveConfig()
+    end
+    
+    return success
 end
 
 -- Initialize the library
@@ -165,9 +235,7 @@ function AnimLogger.init(customConfig)
     end
     
     -- Create log directory if it doesn't exist
-    if not ensureLogDirectory() then
-        print("AnimLogger: Warning - Failed to create log directory")
-    end
+    ensureLogDirectory()
     
     -- Try to load existing configuration
     AnimLogger.loadConfig()
@@ -232,7 +300,7 @@ function AnimLogger.logAnimation(animName, animData)
     -- Create log entry
     local entry = {
         name = animName,
-        timestamp = os.time(),
+        timestamp = os.time and os.time() or 0,
         data = animData or {}
     }
     
@@ -243,10 +311,10 @@ function AnimLogger.logAnimation(animName, animData)
     end
     
     -- Write to log file if verbose logging is enabled
-    if config.logLevel >= 3 then
+    if config.logLevel >= 3 and io then
         local logFile = io.open(config.logFolder .. "/animation_log.txt", "a")
         if logFile then
-            local timeStr = os.date("%Y-%m-%d %H:%M:%S", entry.timestamp)
+            local timeStr = os.date and os.date("%Y-%m-%d %H:%M:%S", entry.timestamp) or tostring(entry.timestamp)
             logFile:write(timeStr .. " - " .. animName .. "\n")
             logFile:close()
         end
@@ -269,22 +337,7 @@ function AnimLogger.renderUI()
     if not initialized then AnimLogger.init() end
     if not config.displayUI then return end
     
-    -- This is a placeholder for the actual UI rendering
-    -- Implementation depends on the UI framework being used
-    -- (e.g., Love2D, custom engine, etc.)
-    
-    -- Example implementation (pseudocode):
-    --[[
-    drawRect(config.uiPosition.x, config.uiPosition.y, config.uiSize.width, config.uiSize.height)
-    drawText("Animation Logger", config.uiPosition.x + 5, config.uiPosition.y + 5)
-    
-    local y = config.uiPosition.y + 25
-    for i = 1, math.min(10, #animationHistory) do
-        local entry = animationHistory[i]
-        drawText(entry.name, config.uiPosition.x + 5, y)
-        y = y + 20
-    end
-    --]]
+    -- This is just a placeholder - actual implementation depends on your UI framework
 end
 
 -- Update function (call this every frame)
