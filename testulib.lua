@@ -87,7 +87,6 @@ function AnimationLogger:CreateUI()
     mainFrame.BackgroundColor3 = BACKGROUND_COLOR
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
-    mainFrame.Draggable = true
     mainFrame.Parent = self.UI
     
     -- Rounded corners
@@ -422,47 +421,8 @@ function AnimationLogger:CreateUI()
     resizeHandleCorner.CornerRadius = UDim.new(0, 3)
     resizeHandleCorner.Parent = resizeHandle
 
-    -- Fix resizable corner functionality
-    local isDragging = false
-    local startSize = nil
-    local startMousePos = nil
-
-    resizeHandle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            isDragging = true
-            startSize = mainFrame.Size
-            startMousePos = UserInputService:GetMouseLocation()
-            
-            -- Change color to indicate active resize
-            TweenService:Create(resizeHandle, TweenInfo.new(0.1), {
-                BackgroundColor3 = Color3.fromRGB(120, 120, 150)
-            }):Play()
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = UserInputService:GetMouseLocation() - startMousePos
-            local newWidth = startSize.X.Offset + delta.X
-            local newHeight = startSize.Y.Offset + delta.Y
-            
-            -- Use the UI layout update function
-            self:UpdateUILayout(newWidth, newHeight)
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if isDragging then
-                isDragging = false
-                
-                -- Change color back
-                TweenService:Create(resizeHandle, TweenInfo.new(0.1), {
-                    BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-                }):Play()
-            end
-        end
-    end)
+    -- Add smooth dragging functionality
+    self:MakeDraggable(mainFrame, header)
 
     -- Add outer glow effect (appears outside the UI)
     local outerGlow = Instance.new("Frame")
@@ -473,6 +433,9 @@ function AnimationLogger:CreateUI()
     outerGlow.BorderSizePixel = 0
     outerGlow.ZIndex = -5 -- Make sure it's behind the main frame
     outerGlow.Parent = self.UI -- Parent to the ScreenGui directly, not the mainFrame
+
+    -- Store outerGlow as a property of self
+    self.outerGlow = outerGlow
 
     -- Make sure it's positioned exactly like mainFrame but bigger
     local function updateGlowPosition()
@@ -502,6 +465,9 @@ function AnimationLogger:CreateUI()
     })
     glowGradient.Rotation = 45
     glowGradient.Parent = outerGlow
+
+    -- Store mainFrame as a property of self
+    self.mainFrame = mainFrame
 
     return self.UI
 end
@@ -689,6 +655,16 @@ function AnimationLogger:AddLog(animName, animId, parryTiming)
         local wasParried = parryTiming ~= nil
         newLog.Visible = isParryAnimation or wasParried
     end
+    
+    -- Auto-scroll to the bottom of the container
+    task.defer(function()
+        -- Small delay to ensure UI updates
+        task.wait()
+        -- Calculate the bottom position
+        local canvasHeight = self.LogsContainer.CanvasSize.Y.Offset
+        -- Set scrolling position to the bottom
+        self.LogsContainer.CanvasPosition = Vector2.new(0, canvasHeight)
+    end)
     
     return logData
 end
@@ -1088,19 +1064,197 @@ function AnimationLogger:StartTracking()
     end)
 end
 
--- Create and initialize the logger
-local logger = AnimationLogger.new()
-logger:SetVisible(true)
-logger:StartTracking()
-
--- Hotkey to toggle visibility
-game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.P then
-        logger:ToggleVisibility()
+function AnimationLogger:CreateLoader()
+    -- Create loading screen ScreenGui
+    local loaderGui = Instance.new("ScreenGui")
+    loaderGui.Name = "RuneTrackerLoader"
+    loaderGui.ResetOnSpawn = false
+    loaderGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    loaderGui.DisplayOrder = 999 -- Make sure it's on top
+    
+    -- Try to parent to CoreGui, fall back to PlayerGui
+    if RunService:IsStudio() then
+        loaderGui.Parent = LOCAL_PLAYER:WaitForChild("PlayerGui")
+    else
+        pcall(function()
+            loaderGui.Parent = game:GetService("CoreGui")
+        end)
+        
+        if not loaderGui.Parent then
+            loaderGui.Parent = LOCAL_PLAYER:WaitForChild("PlayerGui")
+        end
     end
-end)
-
-print("Animation Logger loaded successfully! Press P to toggle visibility")
+    
+    -- Dimmed background
+    local background = Instance.new("Frame")
+    background.Name = "Background"
+    background.Size = UDim2.new(1, 0, 1, 0)
+    background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    background.BackgroundTransparency = 0.5
+    background.BorderSizePixel = 0
+    background.Parent = loaderGui
+    
+    -- Main loader panel
+    local loaderPanel = Instance.new("Frame")
+    loaderPanel.Name = "LoaderPanel"
+    loaderPanel.Size = UDim2.new(0, 400, 0, 250)
+    loaderPanel.Position = UDim2.new(0.5, -200, 0.5, -125)
+    loaderPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    loaderPanel.BorderSizePixel = 0
+    loaderPanel.Parent = loaderGui
+    
+    -- Rounded corners
+    local panelCorner = Instance.new("UICorner")
+    panelCorner.CornerRadius = UDim.new(0, 10)
+    panelCorner.Parent = loaderPanel
+    
+    -- Add subtle glow
+    local panelStroke = Instance.new("UIStroke")
+    panelStroke.Color = Color3.fromRGB(60, 60, 120)
+    panelStroke.Thickness = 2
+    panelStroke.Transparency = 0.2
+    panelStroke.Parent = loaderPanel
+    
+    -- Application name
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "AppName"
+    nameLabel.Size = UDim2.new(1, 0, 0, 50)
+    nameLabel.Position = UDim2.new(0, 0, 0, 20)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = "RuneTracker"
+    nameLabel.TextSize = 32
+    nameLabel.TextColor3 = Color3.fromRGB(220, 220, 255)
+    nameLabel.Parent = loaderPanel
+    
+    -- Subtitle
+    local subtitleLabel = Instance.new("TextLabel")
+    subtitleLabel.Name = "Subtitle"
+    subtitleLabel.Size = UDim2.new(1, 0, 0, 20)
+    subtitleLabel.Position = UDim2.new(0, 0, 0, 70)
+    subtitleLabel.BackgroundTransparency = 1
+    subtitleLabel.Font = Enum.Font.Gotham
+    subtitleLabel.Text = "Animation Analysis & Parry Tracker"
+    subtitleLabel.TextSize = 14
+    subtitleLabel.TextColor3 = Color3.fromRGB(180, 180, 220)
+    subtitleLabel.Parent = loaderPanel
+    
+    -- Loading bar background
+    local loadingBarBg = Instance.new("Frame")
+    loadingBarBg.Name = "LoadingBarBg"
+    loadingBarBg.Size = UDim2.new(0.8, 0, 0, 12)
+    loadingBarBg.Position = UDim2.new(0.1, 0, 0, 120)
+    loadingBarBg.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    loadingBarBg.BorderSizePixel = 0
+    loadingBarBg.Parent = loaderPanel
+    
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0, 6)
+    barCorner.Parent = loadingBarBg
+    
+    -- Loading bar fill
+    local loadingBar = Instance.new("Frame")
+    loadingBar.Name = "LoadingBar"
+    loadingBar.Size = UDim2.new(0, 0, 1, 0)
+    loadingBar.BackgroundColor3 = Color3.fromRGB(80, 120, 255)
+    loadingBar.BorderSizePixel = 0
+    loadingBar.Parent = loadingBarBg
+    
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 6)
+    fillCorner.Parent = loadingBar
+    
+    -- Add gradient to loading bar
+    local fillGradient = Instance.new("UIGradient")
+    fillGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 100, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 140, 255))
+    })
+    fillGradient.Rotation = 90
+    fillGradient.Parent = loadingBar
+    
+    -- Loading text
+    local loadingText = Instance.new("TextLabel")
+    loadingText.Name = "LoadingText"
+    loadingText.Size = UDim2.new(0.8, 0, 0, 20)
+    loadingText.Position = UDim2.new(0.1, 0, 0, 140)
+    loadingText.BackgroundTransparency = 1
+    loadingText.Font = Enum.Font.Gotham
+    loadingText.Text = "Loading components..."
+    loadingText.TextSize = 14
+    loadingText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    loadingText.TextXAlignment = Enum.TextXAlignment.Left
+    loadingText.Parent = loaderPanel
+    
+    -- Credits
+    local creditsLabel = Instance.new("TextLabel")
+    creditsLabel.Name = "Credits"
+    creditsLabel.Size = UDim2.new(1, 0, 0, 20)
+    creditsLabel.Position = UDim2.new(0, 0, 1, -40)
+    creditsLabel.BackgroundTransparency = 1
+    creditsLabel.Font = Enum.Font.Gotham
+    creditsLabel.Text = "Created by vertb1"
+    creditsLabel.TextSize = 14
+    creditsLabel.TextColor3 = Color3.fromRGB(150, 150, 180)
+    creditsLabel.Parent = loaderPanel
+    
+    -- Version
+    local versionLabel = Instance.new("TextLabel")
+    versionLabel.Name = "Version"
+    versionLabel.Size = UDim2.new(0, 100, 0, 20)
+    versionLabel.Position = UDim2.new(1, -110, 1, -40)
+    versionLabel.BackgroundTransparency = 1
+    versionLabel.Font = Enum.Font.Gotham
+    versionLabel.Text = "v1.2.0"
+    versionLabel.TextSize = 14
+    versionLabel.TextColor3 = Color3.fromRGB(150, 150, 180)
+    versionLabel.TextXAlignment = Enum.TextXAlignment.Right
+    versionLabel.Parent = loaderPanel
+    
+    -- Simulate loading sequence
+    local loadSteps = {
+        {percent = 0.2, text = "Initializing core systems..."},
+        {percent = 0.4, text = "Loading animation database..."},
+        {percent = 0.6, text = "Configuring parry detection..."},
+        {percent = 0.8, text = "Building user interface..."},
+        {percent = 1.0, text = "Ready!"}
+    }
+    
+    -- Start loading animation
+    task.spawn(function()
+        for i, step in ipairs(loadSteps) do
+            TweenService:Create(loadingBar, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(step.percent, 0, 1, 0)
+            }):Play()
+            
+            loadingText.Text = step.text
+            
+            -- Wait between steps
+            if i < #loadSteps then
+                task.wait(math.random(0.7, 1.2))
+            else
+                task.wait(0.7)
+                
+                -- Fade out loader when done
+                TweenService:Create(loaderPanel, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    Position = UDim2.new(0.5, -200, 0.5, -225)
+                }):Play()
+                
+                TweenService:Create(background, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    BackgroundTransparency = 1
+                }):Play()
+                
+                task.wait(0.5)
+                loaderGui:Destroy()
+                
+                -- Show main UI
+                self:SetVisible(true)
+            end
+        end
+    end)
+    
+    return loaderGui
+end
 
 function AnimationLogger:ApplyFilter()
     -- Skip if no logs
@@ -1122,29 +1276,130 @@ function AnimationLogger:ApplyFilter()
     end
 end
 
--- Add this function to update UI elements when resizing
 function AnimationLogger:UpdateUILayout(newWidth, newHeight)
     -- Minimum sizes to prevent elements from overlapping
-    newWidth = math.max(550, newWidth)  -- Increased minimum width
+    newWidth = math.max(550, newWidth)
     newHeight = math.max(300, newHeight)
     
-    -- Update main frame size
-    mainFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
+    -- Update main frame size using self properties
+    self.mainFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
     
     -- Adjust logs container size based on new frame size
     self.LogsContainer.Size = UDim2.new(1, -20, 1, -100)
     
     -- Make sure the resizeHandle stays in the bottom right corner
-    resizeHandle.Position = UDim2.new(1, -16, 1, -16)
+    self.resizeHandle.Position = UDim2.new(1, -16, 1, -16)
     
     -- Update outer glow
-    if outerGlow then
-        outerGlow.Size = UDim2.new(0, newWidth + 20, 0, newHeight + 20)
-        outerGlow.Position = UDim2.new(
-            mainFrame.Position.X.Scale,
-            mainFrame.Position.X.Offset - 10,
-            mainFrame.Position.Y.Scale,
-            mainFrame.Position.Y.Offset - 10
+    if self.outerGlow then
+        self.outerGlow.Size = UDim2.new(0, newWidth + 20, 0, newHeight + 20)
+        self.outerGlow.Position = UDim2.new(
+            self.mainFrame.Position.X.Scale,
+            self.mainFrame.Position.X.Offset - 10,
+            self.mainFrame.Position.Y.Scale,
+            self.mainFrame.Position.Y.Offset - 10
         )
     end
 end
+
+-- Add this new method to implement smooth dragging
+function AnimationLogger:MakeDraggable(frame, dragArea)
+    local dragToggle = false
+    local dragStart = nil
+    local startPos = nil
+    local dragSpeed = 0.05 -- Lower = smoother but slower
+    local updateDelta = 0 -- For smoothing
+    
+    local function updateInput(input)
+        local delta = input.Position - dragStart
+        local position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+        
+        -- Use TweenService to make the movement smoother
+        TweenService:Create(
+            frame, 
+            TweenInfo.new(dragSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+            {Position = position}
+        ):Play()
+    end
+    
+    dragArea.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragToggle = true
+            dragStart = input.Position
+            startPos = frame.Position
+            
+            -- Eliminate any tween still running
+            updateDelta = 0
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragToggle = false
+                end
+            end)
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            updateDelta = updateDelta + 1
+            -- Only update every other frame for smoother performance
+            if updateDelta % 2 == 0 then
+                updateInput(input)
+            end
+        end
+    end)
+    
+    -- Add slight elevation effect when dragging begins
+    dragArea.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            -- Add subtle "lift" effect when dragging
+            TweenService:Create(self.outerGlow, TweenInfo.new(0.2), {
+                BackgroundTransparency = 0.2,
+                Size = UDim2.new(0, frame.Size.X.Offset + 30, 0, frame.Size.Y.Offset + 30),
+                Position = UDim2.new(
+                    frame.Position.X.Scale,
+                    frame.Position.X.Offset - 15,
+                    frame.Position.Y.Scale,
+                    frame.Position.Y.Offset - 15
+                )
+            }):Play()
+        end
+    end)
+    
+    -- Reset elevation effect when dragging ends
+    dragArea.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            -- Return to normal appearance
+            TweenService:Create(self.outerGlow, TweenInfo.new(0.3), {
+                BackgroundTransparency = 0.5,
+                Size = UDim2.new(0, frame.Size.X.Offset + 20, 0, frame.Size.Y.Offset + 20),
+                Position = UDim2.new(
+                    frame.Position.X.Scale,
+                    frame.Position.X.Offset - 10,
+                    frame.Position.Y.Scale,
+                    frame.Position.Y.Offset - 10
+                )
+            }):Play()
+        end
+    end)
+end
+
+-- AFTER all methods are defined, then create and initialize the logger
+local logger = AnimationLogger.new()
+logger:SetVisible(false) 
+logger:CreateLoader() -- Now this will work
+logger:StartTracking()
+
+-- Hotkey to toggle visibility
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.P then
+        logger:ToggleVisibility()
+    end
+end)
+
+print("Animation Logger loaded successfully! Press P to toggle visibility")
