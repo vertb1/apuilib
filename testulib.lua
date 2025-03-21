@@ -865,7 +865,13 @@ function AnimationLogger:TrackParryTiming(animationTrack, character)
                 bestParryTime = timeDiff
             end
             
-            return string.format("%.2fs (Best: %.2fs)", timeDiff, bestParryTime)
+            -- Calculate milliseconds for display
+            local currentMs = math.floor(timeDiff * 1000)
+            local bestMs = math.floor(bestParryTime * 1000)
+            
+            -- Return formatted string with seconds and milliseconds
+            return string.format("%.2fs (%dms) | Best: %.2fs (%dms)", 
+                timeDiff, currentMs, bestParryTime, bestMs)
         end
     end
     
